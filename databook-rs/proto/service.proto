@@ -3,5 +3,12 @@ syntax = "proto3";
 package databook;
 
 service Databook {
-  
+  rpc get(GetRequest) returns (GetResponse) {}
 }
+
+message GetRequest {
+    string type = 1;
+    map<string, string> options = 2;
+}
+
+message GetResponse {}

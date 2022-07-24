@@ -1,4 +1,5 @@
 use databook::databook_server::{Databook, DatabookServer};
+use databook::{GetRequest, GetResponse};
 
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
@@ -12,7 +13,14 @@ pub mod databook {
 pub struct DatabookGrpc {}
 
 #[tonic::async_trait]
-impl Databook for DatabookGrpc {}
+impl Databook for DatabookGrpc {
+    #[instrument]
+    async fn get(&self, _request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
+        tracing::info!("Starting get work");
+        let reply = GetResponse {};
+        Ok(Response::new(reply))
+    }
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
