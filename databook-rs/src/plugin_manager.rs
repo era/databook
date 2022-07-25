@@ -82,6 +82,7 @@ impl PluginManager {
         for entry in paths {
             let entry = entry.map_err(|_| PluginError::InvalidFolder)?.path();
             if entry.is_dir() {
+                // invalid plugins are silently ignored
                 Plugin::new_from_folder(entry)
                     .map(|p| self.plugins.insert(p.config.name.clone(), p));
             }
