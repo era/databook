@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+enum InvocationError {}
+
 #[derive(Debug)]
 struct Plugin {
     plugin_type: String,
@@ -20,5 +22,9 @@ impl PlugManager {
             folder,
             plugins: HashMap::new(),
         };
+    }
+    // invokes the plugin using wasm
+    pub fn invoke(plugin_type: String, input: String) -> Result<String, InvocationError> {
+        Ok(input)
     }
 }
