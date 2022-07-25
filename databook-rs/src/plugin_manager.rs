@@ -1,14 +1,59 @@
+use serde::Deserialize;
 use std::collections::HashMap;
+use std::fs;
+use toml;
 
 enum InvocationError {}
-// Plugins are the combination of plugin.wasm and config.toml
-// the config has the following keys:
-// plugin_name (e.g. prometheus)
-//  any other key will be available inside options hashmap
+enum PluginError {
+    InvalidFolder,
+}
+
 #[derive(Debug)]
 struct Plugin {
+    config: PluginConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct PluginConfig {
     name: String,
-    options: HashMap<String, String>,
+}
+
+impl PluginConfig {
+    pub fn new_from_file(path: std::path::PathBuf) -> Option<Self> {
+        match fs::read_to_string(&path) {
+            Ok(config) => Self::new_from_str(&config),
+            Err(_) => None,
+        }
+    }
+    pub fn new_from_str(config: &str) -> Option<Self> {
+        match toml::from_str::<PluginConfig>(&config) {
+            Ok(config) => Some(config),
+            Err(_) => None,
+        }
+    }
+}
+
+impl Plugin {
+    pub fn new_from_folder(path: std::path::PathBuf) -> Option<Self> {
+        let config = path.join("config.toml");
+
+        if !config.is_file() {
+            return None;
+        }
+
+        let wasm = path.join("plugin.wasm");
+
+        if !wasm.is_file() {
+            return None;
+        }
+
+        let config = PluginConfig::new_from_file(config);
+
+        match config {
+            Some(config) => Some(Self { config }),
+            None => None,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -27,6 +72,20 @@ impl PluginManager {
             plugins: HashMap::new(),
         };
     }
+
+    pub fn registry(&mut self) -> Result<(), PluginError> {
+        let paths = fs::read_dir(&self.folder).map_err(|_| PluginError::InvalidFolder)?;
+        for entry in paths {
+            let entry = entry.map_err(|_| PluginError::InvalidFolder)?.path();
+            if entry.is_dir() {
+                Plugin::new_from_folder(entry)
+                    .map(|p| self.plugins.insert(p.config.name.clone(), p));
+            }
+        }
+
+        Ok(())
+    }
+
     // invokes the plugin using wasm
     pub fn invoke(plugin_name: String, input: String) -> Result<String, InvocationError> {
         Ok(input)
