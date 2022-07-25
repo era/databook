@@ -23,7 +23,10 @@ impl PluginConfig {
     pub fn new_from_file(path: std::path::PathBuf) -> Option<Self> {
         match fs::read_to_string(&path) {
             Ok(config) => Self::new_from_str(&config),
-            Err(_) => None,
+            Err(e) => {
+                warn!("unable to read toml config file {:?}", e);
+                None
+            }
         }
     }
     pub fn new_from_str(config: &str) -> Option<Self> {
@@ -42,19 +45,24 @@ impl Plugin {
         let config = path.join("config.toml");
 
         if !config.is_file() {
+            info!("no config file found, ignoring");
             return None;
         }
 
         let wasm = path.join("plugin.wasm");
 
         if !wasm.is_file() {
+            info!("no wasm file found, ignoring");
             return None;
         }
 
         let config = PluginConfig::new_from_file(config);
 
         match config {
-            Some(config) => Some(Self { config }),
+            Some(config) => {
+                info!("valid plugin");
+                Some(Self { config })
+            }
             None => None,
         }
     }
@@ -82,6 +90,7 @@ impl PluginManager {
         for entry in paths {
             let entry = entry.map_err(|_| PluginError::InvalidFolder)?.path();
             if entry.is_dir() {
+                info!("trying to install plugin {:?}", entry.display());
                 // invalid plugins are silently ignored
                 Plugin::new_from_folder(entry)
                     .map(|p| self.plugins.insert(p.config.name.clone(), p));
