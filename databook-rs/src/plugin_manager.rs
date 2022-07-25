@@ -1,3 +1,4 @@
+use log::{info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
@@ -13,7 +14,7 @@ struct Plugin {
     config: PluginConfig,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, PartialEq)]
 struct PluginConfig {
     name: String,
 }
@@ -28,7 +29,10 @@ impl PluginConfig {
     pub fn new_from_str(config: &str) -> Option<Self> {
         match toml::from_str::<PluginConfig>(&config) {
             Ok(config) => Some(config),
-            Err(_) => None,
+            Err(e) => {
+                warn!("unable to parse config file {:?}", e);
+                None
+            }
         }
     }
 }
@@ -89,5 +93,21 @@ impl PluginManager {
     // invokes the plugin using wasm
     pub fn invoke(plugin_name: String, input: String) -> Result<String, InvocationError> {
         Ok(input)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    // Note this useful idiom: importing names from outer (for mod tests) scope.
+    use super::*;
+    #[test]
+    fn test_create_config_from_str() {
+        let config = PluginConfig::new_from_str("name = 'MyTest'");
+        assert_eq!(
+            Some(PluginConfig {
+                name: "MyTest".into()
+            }),
+            config
+        );
     }
 }
