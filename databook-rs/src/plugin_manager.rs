@@ -8,7 +8,7 @@ struct Plugin {
 }
 
 #[derive(Debug)]
-struct PlugManager {
+struct PluginManager {
     // any plugin (wasm files) in this folder will be registered
     folder: Box<std::path::Path>,
 
@@ -16,9 +16,9 @@ struct PlugManager {
     plugins: HashMap<String, Plugin>,
 }
 
-impl PlugManager {
+impl PluginManager {
     pub fn new(folder: Box<std::path::Path>) -> Self {
-        return PlugManager {
+        return Self {
             folder,
             plugins: HashMap::new(),
         };
