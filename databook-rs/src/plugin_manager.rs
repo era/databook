@@ -4,8 +4,12 @@ use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use toml;
-
-pub enum InvocationError {}
+#[derive(Debug)]
+pub enum InvocationError {
+    PluginDoesNotExist,
+    GenericError,
+}
+#[derive(Debug)]
 pub enum PluginError {
     InvalidFolder,
 }
@@ -72,6 +76,12 @@ impl Plugin {
             None => None,
         }
     }
+
+    pub fn invoke(&self, input: String) -> Result<String, InvocationError> {
+        self.wasm
+            .invoke(input)
+            .map_err(|_| InvocationError::GenericError)
+    }
 }
 
 #[derive(Debug)]
@@ -107,8 +117,12 @@ impl PluginManager {
     }
 
     // invokes the plugin using wasm
-    pub fn invoke(plugin_name: String, input: String) -> Result<String, InvocationError> {
-        Ok(input)
+    pub fn invoke(&self, plugin_name: &str, input: String) -> Result<String, InvocationError> {
+        self.plugins
+            .get(plugin_name)
+            .map_or(Err(InvocationError::PluginDoesNotExist), |p| {
+                p.invoke(input)
+            })
     }
 }
 

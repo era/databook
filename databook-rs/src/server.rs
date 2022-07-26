@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use databook::{GetRequest, GetResponse};
 use tonic::transport::Server;
-use tonic::{Request, Response, Status};
+use tonic::{Code, Request, Response, Status};
 use tracing::instrument;
 
 mod plugin_manager;
@@ -40,9 +40,14 @@ impl DatabookGrpc {
 #[tonic::async_trait]
 impl Databook for DatabookGrpc {
     #[instrument]
-    async fn get(&self, _request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
+    async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         tracing::info!("Starting get work");
-        let reply = GetResponse {};
+        let response = self
+            .plugin_manager
+            .invoke(&request.into_inner().name, "sample_input".to_string())
+            .map_err(|e| Status::new(Code::Internal, "Internal Error"))?; //TODO
+
+        let reply = GetResponse { output: response };
         Ok(Response::new(reply))
     }
 }

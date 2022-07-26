@@ -7,8 +7,10 @@ service Databook {
 }
 
 message GetRequest {
-    string type = 1;
+    string name = 1;
     map<string, string> options = 2;
 }
 
-message GetResponse {}
+message GetResponse {
+    string output = 1;
+  }

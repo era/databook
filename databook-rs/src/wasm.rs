@@ -3,7 +3,7 @@ use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 #[derive(Debug)]
 pub enum WasmError {
-    generic_error(String),
+    GenericError(String),
 }
 
 #[derive(Debug)]
@@ -21,8 +21,8 @@ impl WasmModule {
         // of our input wasm module. In this case it'll be JIT-compiled after
         // we parse the text format.
         //could use from_binary as well
-        let module = Module::from_file(&engine, path)
-            .map_err(|e| WasmError::generic_error(e.to_string()))?;
+        let module =
+            Module::from_file(&engine, path).map_err(|e| WasmError::GenericError(e.to_string()))?;
 
         // A `Store` is what will own instances, functions, globals, etc. All wasm
         // items are stored within a `Store`, and it's what we'll always be using to
@@ -34,7 +34,7 @@ impl WasmModule {
 
         let instance = linker
             .instantiate(&mut store, &module)
-            .map_err(|e| WasmError::generic_error(e.to_string()))?;
+            .map_err(|e| WasmError::GenericError(e.to_string()))?;
 
         //memory setup
         let memory_type = MemoryType::new(1, None);
