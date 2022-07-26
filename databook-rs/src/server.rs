@@ -7,6 +7,7 @@ use tonic::{Request, Response, Status};
 use tracing::instrument;
 
 mod plugin_manager;
+mod wasm;
 
 pub mod databook {
     tonic::include_proto!("databook");
