@@ -1,5 +1,6 @@
 use clap::Parser;
 use databook::databook_server::{Databook, DatabookServer};
+use std::path::PathBuf;
 
 use databook::{GetRequest, GetResponse};
 use tonic::transport::Server;
@@ -24,8 +25,17 @@ struct Args {
     address_to_listen: String,
 }
 
-#[derive(Debug, Default)]
-pub struct DatabookGrpc {}
+#[derive(Debug)]
+pub struct DatabookGrpc {
+    plugin_manager: plugin_manager::PluginManager,
+}
+
+impl DatabookGrpc {
+    pub fn new(plugin_folder: String) -> Self {
+        let plugin_manager = plugin_manager::PluginManager::new(PathBuf::from(plugin_folder));
+        Self { plugin_manager }
+    }
+}
 
 #[tonic::async_trait]
 impl Databook for DatabookGrpc {
@@ -45,8 +55,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber)?;
     // Setups GRPC server
     let addr = args.address_to_listen.parse()?;
+    let grpc = DatabookGrpc::new(args.plugin_folder);
     Server::builder()
-        .add_service(DatabookServer::new(DatabookGrpc::default()))
+        .add_service(DatabookServer::new(grpc))
         .serve(addr)
         .await?;
     Ok(())

@@ -1,17 +1,19 @@
+use crate::wasm::WasmModule;
 use log::{info, warn};
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use toml;
 
-enum InvocationError {}
-enum PluginError {
+pub enum InvocationError {}
+pub enum PluginError {
     InvalidFolder,
 }
 
 #[derive(Debug)]
 struct Plugin {
     config: PluginConfig,
+    wasm: WasmModule,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -57,11 +59,15 @@ impl Plugin {
         }
 
         let config = PluginConfig::new_from_file(config);
+        let wasm = match WasmModule::new(wasm.to_str().unwrap()) {
+            Ok(wasm) => wasm,
+            Err(_) => return None, //TODO
+        };
 
         match config {
             Some(config) => {
                 info!("valid plugin");
-                Some(Self { config })
+                Some(Self { config, wasm })
             }
             None => None,
         }
@@ -69,16 +75,16 @@ impl Plugin {
 }
 
 #[derive(Debug)]
-struct PluginManager {
+pub struct PluginManager {
     // any plugin (wasm files) in this folder will be registered
-    folder: Box<std::path::Path>,
+    folder: std::path::PathBuf,
 
     //all plugins registered, <Name, Plugin>
     plugins: HashMap<String, Plugin>,
 }
 
 impl PluginManager {
-    pub fn new(folder: Box<std::path::Path>) -> Self {
+    pub fn new(folder: std::path::PathBuf) -> Self {
         return Self {
             folder,
             plugins: HashMap::new(),

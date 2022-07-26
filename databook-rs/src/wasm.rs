@@ -1,10 +1,12 @@
 use wasmtime::*;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
+#[derive(Debug)]
 pub enum WasmError {
     generic_error(String),
 }
 
+#[derive(Debug)]
 pub struct WasmModule {
     pub instance: Instance,
 }
