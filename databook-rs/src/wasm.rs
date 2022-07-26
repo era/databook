@@ -1,6 +1,8 @@
 use wasmtime::*;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
+wit_bindgen_wasmtime::import!("../wit/plugin.wit");
+
 #[derive(Debug)]
 pub enum WasmError {
     GenericError(String),
