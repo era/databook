@@ -39,4 +39,8 @@ impl WasmModule {
         let memory = Memory::new(store, memory_type);
         Ok(Self { instance })
     }
+
+    pub fn invoke(&self, input: String) -> Result<String, WasmError> {
+        Ok(input)
+    }
 }
