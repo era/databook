@@ -41,13 +41,16 @@ impl DatabookGrpc {
 impl Databook for DatabookGrpc {
     #[instrument]
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
-        tracing::info!("Starting get work");
+        tracing::info!("received get request");
         let response = match PLUGINS.get() {
             Some(p) => p
                 .lock()
                 .unwrap() //TODO
                 .invoke(&request.into_inner().name, "sample_input".to_string())
-                .map_err(|e| Status::new(Code::Internal, "Internal Error")), //TODO
+                .map_err(|e| {
+                    tracing::error!("error while calling wasm plugin {:?}", e);
+                    Status::new(Code::Internal, "Internal Error")
+                }), //TODO
             None => Err(Status::new(Code::Internal, "No plugins setup")),
         }?;
 
@@ -63,7 +66,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber)?;
 
-    let plugin_manager = plugin_manager::PluginManager::new(PathBuf::from(args.plugin_folder));
+    let mut plugin_manager = plugin_manager::PluginManager::new(PathBuf::from(args.plugin_folder));
+    plugin_manager.registry(); //TODO check error
     PLUGINS
         .set(Mutex::new(plugin_manager))
         .expect("should always add plugin manager to once_cell");
