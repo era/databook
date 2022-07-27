@@ -1,16 +1,37 @@
+use std::fmt;
 use wasmtime::*;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 wit_bindgen_wasmtime::import!("../wit/plugin.wit");
+use plugin::{Plugin, PluginData};
+
+struct Context<I, E> {
+    wasi: wasmtime_wasi::WasiCtx,
+    imports: I,
+    exports: E,
+}
+type PluginStore = Store<Context<PluginData, PluginData>>;
 
 #[derive(Debug)]
 pub enum WasmError {
     GenericError(String),
 }
 
-#[derive(Debug)]
 pub struct WasmModule {
-    pub instance: Instance,
+    module: Module,
+    linker: Linker<Context<PluginData, PluginData>>,
+    engine: Engine,
+}
+impl fmt::Debug for WasmModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WasmModule").finish()
+    }
+}
+
+fn default_wasi() -> wasmtime_wasi::WasiCtx {
+    wasmtime_wasi::sync::WasiCtxBuilder::new()
+        .inherit_stdio()
+        .build()
 }
 
 impl WasmModule {
@@ -26,25 +47,42 @@ impl WasmModule {
         let module =
             Module::from_file(&engine, path).map_err(|e| WasmError::GenericError(e.to_string()))?;
 
-        // A `Store` is what will own instances, functions, globals, etc. All wasm
-        // items are stored within a `Store`, and it's what we'll always be using to
-        // interact with the wasm world. Custom data can be stored in stores but for
-        // now we just use `()`.
-        let mut store = Store::new(&engine, ());
-
         let mut linker = Linker::new(&engine);
 
-        let instance = linker
-            .instantiate(&mut store, &module)
-            .map_err(|e| WasmError::GenericError(e.to_string()))?;
+        wasmtime_wasi::add_to_linker(&mut linker, |cx: &mut Context<PluginData, PluginData>| {
+            &mut cx.wasi
+        })
+        .map_err(|e| WasmError::GenericError(e.to_string()))?;
 
-        //memory setup
-        let memory_type = MemoryType::new(1, None);
-        let memory = Memory::new(store, memory_type);
-        Ok(Self { instance })
+        Ok(Self {
+            module,
+            linker,
+            engine,
+        })
     }
 
-    pub fn invoke(&self, input: String) -> Result<String, WasmError> {
-        Ok(input)
+    fn new_store(&self) -> Store<Context<PluginData, PluginData>> {
+        Store::new(
+            &self.engine,
+            Context {
+                wasi: default_wasi(),
+                imports: PluginData::default(),
+                exports: PluginData::default(),
+            },
+        )
+    }
+
+    // invokes the plugin and gets the output from it
+    pub fn invoke(&mut self, input: String) -> Result<String, WasmError> {
+        let mut store = self.new_store();
+        let (plugin, _instance) =
+            Plugin::instantiate(&mut store, &self.module, &mut self.linker, |cx| {
+                &mut cx.exports
+            })
+            .map_err(|e| WasmError::GenericError(e.to_string()))?;
+
+        plugin
+            .invoke(&mut store, &input)
+            .map_err(|e| WasmError::GenericError(e.to_string()))
     }
 }

@@ -1,19 +1,21 @@
 use clap::Parser;
 use databook::databook_server::{Databook, DatabookServer};
-use std::path::PathBuf;
-
 use databook::{GetRequest, GetResponse};
+use once_cell::sync::OnceCell;
+use std::path::PathBuf;
+use std::sync::Mutex;
 use tonic::transport::Server;
 use tonic::{Code, Request, Response, Status};
 use tracing::instrument;
 
-mod bindings;
 mod plugin_manager;
 mod wasm;
 
 pub mod databook {
     tonic::include_proto!("databook");
 }
+
+static PLUGINS: OnceCell<Mutex<plugin_manager::PluginManager>> = OnceCell::new();
 
 // CLI arguments to start the server
 #[derive(Parser, Debug)]
@@ -27,14 +29,11 @@ struct Args {
 }
 
 #[derive(Debug)]
-pub struct DatabookGrpc {
-    plugin_manager: plugin_manager::PluginManager,
-}
+pub struct DatabookGrpc {}
 
 impl DatabookGrpc {
-    pub fn new(plugin_folder: String) -> Self {
-        let plugin_manager = plugin_manager::PluginManager::new(PathBuf::from(plugin_folder));
-        Self { plugin_manager }
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
@@ -43,10 +42,14 @@ impl Databook for DatabookGrpc {
     #[instrument]
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         tracing::info!("Starting get work");
-        let response = self
-            .plugin_manager
-            .invoke(&request.into_inner().name, "sample_input".to_string())
-            .map_err(|e| Status::new(Code::Internal, "Internal Error"))?; //TODO
+        let response = match PLUGINS.get() {
+            Some(p) => p
+                .lock()
+                .unwrap() //TODO
+                .invoke(&request.into_inner().name, "sample_input".to_string())
+                .map_err(|e| Status::new(Code::Internal, "Internal Error")), //TODO
+            None => Err(Status::new(Code::Internal, "No plugins setup")),
+        }?;
 
         let reply = GetResponse { output: response };
         Ok(Response::new(reply))
@@ -59,9 +62,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Setups tracing
     let subscriber = tracing_subscriber::FmtSubscriber::new();
     tracing::subscriber::set_global_default(subscriber)?;
+
+    let plugin_manager = plugin_manager::PluginManager::new(PathBuf::from(args.plugin_folder));
+    PLUGINS
+        .set(Mutex::new(plugin_manager))
+        .expect("should always add plugin manager to once_cell");
     // Setups GRPC server
     let addr = args.address_to_listen.parse()?;
-    let grpc = DatabookGrpc::new(args.plugin_folder);
+    let grpc = DatabookGrpc::new();
     Server::builder()
         .add_service(DatabookServer::new(grpc))
         .serve(addr)
