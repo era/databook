@@ -1,0 +1,14 @@
+record HttpRequest {
+    url: string,
+    query_params: string,
+    body_request: string,
+    headers: string
+}
+
+record HttpResponse {
+    status_code: u32,
+    headers: string,
+    response: string,
+}
+
+http_request(request: HttpRequest) -> HttpResponse
