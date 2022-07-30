@@ -3,7 +3,11 @@ use wasmtime::*;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 
 wit_bindgen_wasmtime::import!("../wit/plugin.wit");
+wit_bindgen_wasmtime::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
+use runtime::{HttpRequest, HttpResponse, Runtime};
+
+pub struct PluginRuntime;
 
 struct Context<I, E> {
     wasi: wasmtime_wasi::WasiCtx,
@@ -49,6 +53,8 @@ impl WasmModule {
 
         let mut linker = Linker::new(&engine);
 
+        //TODO add to the linker the runtime methods
+
         wasmtime_wasi::add_to_linker(&mut linker, |cx: &mut Context<PluginData, PluginData>| {
             &mut cx.wasi
         })
@@ -84,5 +90,15 @@ impl WasmModule {
         plugin
             .invoke(&mut store, &input)
             .map_err(|e| WasmError::GenericError(e.to_string()))
+    }
+}
+
+impl runtime::Runtime for PluginRuntime {
+    fn http(&mut self, request: HttpRequest) -> HttpResponse {
+        HttpResponse {
+            status: 200,
+            headers: "".to_string(),
+            response: "".to_string(),
+        }
     }
 }
