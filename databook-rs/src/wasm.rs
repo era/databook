@@ -1,18 +1,19 @@
 use std::fmt;
-use wasmtime::*;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
+use wit_bindgen_wasmtime::wasmtime::{self, Config, Engine, Instance, Linker, Module, Store};
 
 wit_bindgen_wasmtime::import!("../wit/plugin.wit");
 wit_bindgen_wasmtime::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
-use runtime::{HttpRequest, HttpResponse, Runtime};
+use runtime::{add_to_linker, HttpRequest, HttpResponse, Runtime};
 
-pub struct PluginRuntime;
+pub struct PluginRuntime {}
 
 struct Context<I, E> {
     wasi: wasmtime_wasi::WasiCtx,
     imports: I,
     exports: E,
+    runtime: PluginRuntime,
 }
 type PluginStore = Store<Context<PluginData, PluginData>>;
 
@@ -60,6 +61,8 @@ impl WasmModule {
         })
         .map_err(|e| WasmError::GenericError(e.to_string()))?;
 
+        add_to_linker(&mut linker, |cx| &mut cx.runtime)
+            .map_err(|e| WasmError::GenericError(e.to_string()))?;
         Ok(Self {
             module,
             linker,
@@ -74,6 +77,7 @@ impl WasmModule {
                 wasi: default_wasi(),
                 imports: PluginData::default(),
                 exports: PluginData::default(),
+                runtime: PluginRuntime {},
             },
         )
     }
