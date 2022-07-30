@@ -54,8 +54,6 @@ impl WasmModule {
 
         let mut linker = Linker::new(&engine);
 
-        //TODO add to the linker the runtime methods
-
         wasmtime_wasi::add_to_linker(&mut linker, |cx: &mut Context<PluginData, PluginData>| {
             &mut cx.wasi
         })
