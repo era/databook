@@ -1,4 +1,7 @@
+use crossbeam::channel;
+use hyper::{Body, Client, Method, Request, Uri};
 use std::fmt;
+use tokio;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 use wit_bindgen_wasmtime::wasmtime::{self, Config, Engine, Instance, Linker, Module, Store};
 
@@ -97,10 +100,33 @@ impl WasmModule {
 
 impl runtime::Runtime for PluginRuntime {
     fn http(&mut self, request: HttpRequest) -> HttpResponse {
+        //TODO VALIDATION
+        let req = Request::builder()
+            .uri(build_http_url(request.url, request.params))
+            .method(request.method)
+            .body(Body::from(r#"{"library":"hyper"}"#))
+            //.headers
+            .unwrap(); //TODO
+
+        let client = Client::new();
+        //TODO ASYNC / SYNC BRIDGE
+        let (tx, rx) = channel::bounded(1);
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let handle = rt.handle();
+        handle.spawn(async move {
+            tx.send(client.request(req).await.unwrap());
+        });
+
+        let response = rx.recv().unwrap();
+
         HttpResponse {
-            status: 200,
-            headers: "".to_string(),
-            response: "".to_string(),
+            status: response.status().as_u16(),
+            headers: "".to_string(),  //TODO
+            response: "".to_string(), //response.into_body(), //TODO
         }
     }
+}
+
+fn build_http_url(uri: &str, params: &str) -> String {
+    format!("{}?{}", uri, params)
 }
