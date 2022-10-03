@@ -4,6 +4,7 @@ use hyper::{Body, Client, HeaderMap, Method, Request, Uri};
 use std::collections::HashMap;
 use std::fmt;
 use tokio;
+use tracing::instrument;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 use wit_bindgen_wasmtime::wasmtime::{self, Config, Engine, Instance, Linker, Module, Store};
 
@@ -86,6 +87,7 @@ impl WasmModule {
     }
 
     // invokes the plugin and gets the output from it
+    #[instrument]
     pub fn invoke(&mut self, input: String) -> Result<String, WasmError> {
         let mut store = self.new_store();
         let (plugin, _instance) =
