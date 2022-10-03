@@ -24,6 +24,8 @@ All plugins are run independently of each other and from previous execution. So 
 
 Databook-rs uses wasmtime.
 
+If you want to test out the databook-rs without any front-end, you can start it with a simple: `cargo run --bin server` and you can send a super simple request using: `cargo run --bin client`.
+
 ### web
 
 TODO explain
