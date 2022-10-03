@@ -149,20 +149,18 @@ fn http_headers_from_str(
 ) -> hyper::http::request::Builder {
     let splitted: Vec<&str> = headers.split('&').collect();
 
-    for i in 0..splitted.len() {
-        if let Some(header) = splitted.get(i) {
-            let header: Vec<&str> = header.split('=').collect();
+    for header in splitted {
+        let header: Vec<&str> = header.split('=').collect();
 
-            match (header.get(0), header.get(1)) {
-                (Some(key), Some(value)) => {
-                    req = req.header(
-                        key.to_string().parse::<HeaderName>().unwrap(),
-                        value.to_string().parse::<HeaderValue>().unwrap(),
-                    )
-                }
-                _ => continue,
-            };
-        }
+        match (header.get(0), header.get(1)) {
+            (Some(key), Some(value)) => {
+                req = req.header(
+                    key.to_string().parse::<HeaderName>().unwrap(),
+                    value.to_string().parse::<HeaderValue>().unwrap(),
+                )
+            }
+            _ => continue,
+        };
     }
     return req;
 }
