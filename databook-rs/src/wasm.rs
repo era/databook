@@ -1,5 +1,7 @@
 use crossbeam::channel;
-use hyper::{Body, Client, Method, Request, Uri};
+use hyper::header::{HeaderName, HeaderValue};
+use hyper::{Body, Client, HeaderMap, Method, Request, Uri};
+use std::collections::HashMap;
 use std::fmt;
 use tokio;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
@@ -101,12 +103,12 @@ impl WasmModule {
 impl runtime::Runtime for PluginRuntime {
     fn http(&mut self, request: HttpRequest) -> HttpResponse {
         //TODO VALIDATION
+
         let req = Request::builder()
             .uri(build_http_url(request.url, request.params))
-            .method(request.method)
-            .body(Body::from(r#"{"library":"hyper"}"#))
-            //.headers
-            .unwrap(); //TODO
+            .method(request.method);
+        let req = http_headers_from_str(request.headers, req);
+        let req = req.body(Body::from(request.body.to_string())).unwrap(); //TODO
 
         let client = Client::new();
         //TODO ASYNC / SYNC BRIDGE
@@ -129,4 +131,28 @@ impl runtime::Runtime for PluginRuntime {
 
 fn build_http_url(uri: &str, params: &str) -> String {
     format!("{}?{}", uri, params)
+}
+
+fn http_headers_from_str(
+    headers: &str,
+    mut req: hyper::http::request::Builder,
+) -> hyper::http::request::Builder {
+    let splitted: Vec<&str> = headers.split('&').collect();
+
+    for i in 0..splitted.len() {
+        if let Some(header) = splitted.get(i) {
+            let header: Vec<&str> = header.split('=').collect();
+
+            match (header.get(0), header.get(1)) {
+                (Some(key), Some(value)) => {
+                    req = req.header(
+                        key.to_string().parse::<HeaderName>().unwrap(),
+                        value.to_string().parse::<HeaderValue>().unwrap(),
+                    )
+                }
+                _ => continue,
+            };
+        }
+    }
+    return req;
 }
