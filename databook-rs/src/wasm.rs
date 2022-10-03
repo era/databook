@@ -1,7 +1,6 @@
+use crate::http::{build_http_url, http_headers_from_str};
 use crossbeam::channel;
-use hyper::header::{HeaderName, HeaderValue};
 use hyper::{Body, Client, HeaderMap, Method, Request, Uri};
-use std::collections::HashMap;
 use std::fmt;
 use tokio;
 use tracing::instrument;
@@ -137,30 +136,4 @@ impl runtime::Runtime for PluginRuntime {
         //TODO if allowed get the value of key
         "".to_string()
     }
-}
-
-fn build_http_url(uri: &str, params: &str) -> String {
-    format!("{}?{}", uri, params)
-}
-
-fn http_headers_from_str(
-    headers: &str,
-    mut req: hyper::http::request::Builder,
-) -> hyper::http::request::Builder {
-    let splitted: Vec<&str> = headers.split('&').collect();
-
-    for header in splitted {
-        let header: Vec<&str> = header.split('=').collect();
-
-        match (header.get(0), header.get(1)) {
-            (Some(key), Some(value)) => {
-                req = req.header(
-                    key.to_string().parse::<HeaderName>().unwrap(),
-                    value.to_string().parse::<HeaderValue>().unwrap(),
-                )
-            }
-            _ => continue,
-        };
-    }
-    return req;
 }
