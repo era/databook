@@ -116,10 +116,13 @@ impl runtime::Runtime for PluginRuntime {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let handle = rt.handle();
         handle.spawn(async move {
+            tracing::info!("doing http request");
             tx.send(client.request(req).await.unwrap());
         });
 
         let response = rx.recv().unwrap();
+        tracing::info!("http response is {:?}", response);
+        rt.shutdown_background();
 
         HttpResponse {
             status: response.status().as_u16(),
