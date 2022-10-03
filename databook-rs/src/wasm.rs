@@ -132,6 +132,11 @@ impl runtime::Runtime for PluginRuntime {
             response: "".to_string(), //response.into_body(), //TODO
         }
     }
+
+    fn env(&mut self, key: &str) -> String {
+        //TODO if allowed get the value of key
+        "".to_string()
+    }
 }
 
 fn build_http_url(uri: &str, params: &str) -> String {

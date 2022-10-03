@@ -13,3 +13,5 @@ record http-response {
 }
 
 http: func(request: http-request) -> http-response
+
+env: func(key: string) -> string
