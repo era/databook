@@ -1,4 +1,4 @@
-use hyper::header::{HeaderName, HeaderValue};
+use hyper::header::{HeaderMap, HeaderName, HeaderValue};
 
 pub fn build_http_url(uri: &str, params: &str) -> String {
     format!("{}?{}", uri, params)
@@ -24,6 +24,15 @@ pub fn http_headers_from_str(
         };
     }
     return req;
+}
+
+pub fn http_headers_to_str(header_map: HeaderMap) -> String {
+    let mut header_as_str = Vec::<String>::new();
+    for (key, value) in header_map {
+        header_as_str.push(key.unwrap().as_str().into()); //TODO
+        header_as_str.push(value.to_str().unwrap().into()); //TODO
+    }
+    header_as_str.join("&")
 }
 
 #[cfg(test)]

@@ -1,11 +1,12 @@
-use crate::http::{build_http_url, http_headers_from_str};
+use crate::http::{build_http_url, http_headers_from_str, http_headers_to_str};
 use crossbeam::channel;
-use hyper::{Body, Client, HeaderMap, Method, Request, Uri};
+use hyper::{Body, Client, HeaderMap, Method, Request, Response, Uri};
 use std::fmt;
+use std::str;
 use tokio;
 use tracing::instrument;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
-use wit_bindgen_wasmtime::wasmtime::{self, Config, Engine, Instance, Linker, Module, Store};
+use wit_bindgen_wasmtime::wasmtime::{self, Config, Engine, Instance, Linker, Module, Store}; // 0.1.25
 
 wit_bindgen_wasmtime::import!("../wit/plugin.wit");
 wit_bindgen_wasmtime::export!("../wit/runtime.wit");
@@ -118,18 +119,26 @@ impl runtime::Runtime for PluginRuntime {
         let handle = rt.handle();
         handle.spawn(async move {
             tracing::info!("doing http request");
-            tx.send(client.request(req).await.unwrap());
+            let response = client.request(req).await.unwrap();
+            tracing::info!("http response is {:?}", response);
+
+            let status = response.status().as_u16();
+            //TODO check status code
+            let headers = http_headers_to_str(response.headers().clone()); //TODO
+
+            let response_body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+            let response_body = String::from_utf8(response_body.into_iter().collect()).expect("");
+
+            tx.send(HttpResponse {
+                status,
+                headers,
+                response: response_body,
+            })
         });
-
         let response = rx.recv().unwrap();
-        tracing::info!("http response is {:?}", response);
-        rt.shutdown_background();
 
-        HttpResponse {
-            status: response.status().as_u16(),
-            headers: "".to_string(),  //TODO
-            response: "".to_string(), //response.into_body(), //TODO
-        }
+        rt.shutdown_background();
+        response
     }
 
     fn env(&mut self, key: &str) -> String {
