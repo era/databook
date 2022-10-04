@@ -102,25 +102,6 @@ impl WasmModule {
             .map_err(|e| WasmError::GenericError(e.to_string()))
     }
 }
-pub async fn do_request(request: Request<hyper::Body>) -> HttpResponse {
-    let client: Client<HttpConnector, hyper::Body> = Client::new();
-    tracing::info!("doing http request");
-    let response = client.request(request).await.unwrap();
-    tracing::info!("http response is {:?}", response);
-
-    let status = response.status().as_u16();
-    //TODO check status code
-    let headers = http_headers_to_str(response.headers().clone()); //TODO
-
-    let response_body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-    let response_body = String::from_utf8(response_body.into_iter().collect()).expect("");
-
-    HttpResponse {
-        status,
-        headers,
-        response: response_body,
-    }
-}
 
 impl runtime::Runtime for PluginRuntime {
     fn http(&mut self, request: HttpRequest) -> HttpResponse {
@@ -146,5 +127,27 @@ impl runtime::Runtime for PluginRuntime {
     fn env(&mut self, key: &str) -> String {
         //TODO if allowed get the value of key
         "".to_string()
+    }
+}
+
+pub async fn do_request(request: Request<hyper::Body>) -> HttpResponse {
+    //TODO test it with https://bestrustcrates.com/p/http-mocking-to-lukemathwalkerwiremock-rs/index.html
+    let client: Client<HttpConnector, hyper::Body> = Client::new();
+
+    tracing::info!("doing http request {:?}", request);
+    let response = client.request(request).await.unwrap();
+    tracing::info!("http response is {:?}", response);
+
+    let status = response.status().as_u16();
+    //TODO check status code
+    let headers = http_headers_to_str(response.headers().clone()); //TODO
+
+    let response_body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let response_body = String::from_utf8(response_body.into_iter().collect()).expect("");
+
+    HttpResponse {
+        status,
+        headers,
+        response: response_body,
     }
 }
