@@ -52,18 +52,18 @@ mod tests {
     #[test]
     fn test_http_headers_from_str() {
         let header = "content=x&something=y";
-        let mut headerMap = HeaderMap::new();
-        headerMap.insert(
+        let mut header_map = HeaderMap::new();
+        header_map.insert(
             "content".to_string().parse::<HeaderName>().unwrap(),
             "x".to_string().parse::<HeaderValue>().unwrap(),
         );
-        headerMap.insert(
+        header_map.insert(
             "something".to_string().parse::<HeaderName>().unwrap(),
             "y".to_string().parse::<HeaderValue>().unwrap(),
         );
 
         assert_eq!(
-            &headerMap,
+            &header_map,
             http_headers_from_str(header, Builder::new())
                 .headers_ref()
                 .unwrap()
