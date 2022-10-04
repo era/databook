@@ -131,7 +131,6 @@ impl runtime::Runtime for PluginRuntime {
 }
 
 pub async fn do_request(request: Request<hyper::Body>) -> HttpResponse {
-    //TODO test it with https://bestrustcrates.com/p/http-mocking-to-lukemathwalkerwiremock-rs/index.html
     let client: Client<HttpConnector, hyper::Body> = Client::new();
 
     tracing::info!("doing http request {:?}", request);
@@ -149,5 +148,37 @@ pub async fn do_request(request: Request<hyper::Body>) -> HttpResponse {
         status,
         headers,
         response: response_body,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    #[test]
+    fn test_runtime_http() {
+        let mock_server = tokio_test::block_on(MockServer::start());
+        tokio_test::block_on(
+            Mock::given(method("GET"))
+                .and(path("/"))
+                .respond_with(ResponseTemplate::new(200))
+                // Mounting the mock on the mock server - it's now effective!
+                .mount(&mock_server),
+        );
+
+        let req = HttpRequest {
+            method: "get".into(),
+            url: &mock_server.uri(),
+            params: "test=a",
+            body: "{}",
+            headers: "bc=1&ac=2",
+        };
+
+        let mut runtime = PluginRuntime {};
+        let response = runtime.http(req);
+
+        assert_eq!(200, response.status)
     }
 }
