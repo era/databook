@@ -1,5 +1,6 @@
 use crate::http::{build_http_url, http_headers_from_str, http_headers_to_str};
 use crossbeam::channel;
+use hyper::client::HttpConnector;
 use hyper::{Body, Client, HeaderMap, Method, Request, Response, Uri};
 use std::fmt;
 use std::str;
@@ -101,6 +102,25 @@ impl WasmModule {
             .map_err(|e| WasmError::GenericError(e.to_string()))
     }
 }
+pub async fn do_request(request: Request<hyper::Body>) -> HttpResponse {
+    let client: Client<HttpConnector, hyper::Body> = Client::new();
+    tracing::info!("doing http request");
+    let response = client.request(request).await.unwrap();
+    tracing::info!("http response is {:?}", response);
+
+    let status = response.status().as_u16();
+    //TODO check status code
+    let headers = http_headers_to_str(response.headers().clone()); //TODO
+
+    let response_body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+    let response_body = String::from_utf8(response_body.into_iter().collect()).expect("");
+
+    HttpResponse {
+        status,
+        headers,
+        response: response_body,
+    }
+}
 
 impl runtime::Runtime for PluginRuntime {
     fn http(&mut self, request: HttpRequest) -> HttpResponse {
@@ -112,29 +132,11 @@ impl runtime::Runtime for PluginRuntime {
         let req = http_headers_from_str(request.headers, req);
         let req = req.body(Body::from(request.body.to_string())).unwrap(); //TODO
 
-        let client = Client::new();
         //TODO ASYNC / SYNC BRIDGE
         let (tx, rx) = channel::bounded(1);
         let rt = tokio::runtime::Runtime::new().unwrap();
         let handle = rt.handle();
-        handle.spawn(async move {
-            tracing::info!("doing http request");
-            let response = client.request(req).await.unwrap();
-            tracing::info!("http response is {:?}", response);
-
-            let status = response.status().as_u16();
-            //TODO check status code
-            let headers = http_headers_to_str(response.headers().clone()); //TODO
-
-            let response_body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-            let response_body = String::from_utf8(response_body.into_iter().collect()).expect("");
-
-            tx.send(HttpResponse {
-                status,
-                headers,
-                response: response_body,
-            })
-        });
+        handle.spawn(async move { tx.send(do_request(req).await) });
         let response = rx.recv().unwrap();
 
         rt.shutdown_background();
