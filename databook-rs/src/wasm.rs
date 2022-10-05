@@ -183,6 +183,7 @@ mod tests {
             config: PluginConfig {
                 name: "TestPlugin".to_string(),
                 allowed_env_vars: None,
+                allowed_domains: Some(vec![mock_server.uri().clone()]),
             },
         };
         let response = runtime.http(req);
