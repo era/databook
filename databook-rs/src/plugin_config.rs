@@ -2,7 +2,7 @@ use serde::Deserialize;
 use std::fs;
 use toml;
 
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Debug, Deserialize, PartialEq, Clone)]
 pub struct PluginConfig {
     pub name: String,
     pub allowed_env_vars: Option<Vec<String>>,

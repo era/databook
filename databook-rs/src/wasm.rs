@@ -15,7 +15,9 @@ wit_bindgen_wasmtime::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
 use runtime::{add_to_linker, HttpRequest, HttpResponse, Runtime};
 
-pub struct PluginRuntime {}
+pub struct PluginRuntime {
+    config: PluginConfig,
+}
 
 struct Context<I, E> {
     wasi: wasmtime_wasi::WasiCtx,
@@ -76,26 +78,22 @@ impl WasmModule {
         })
     }
 
-    fn new_store(&self) -> Store<Context<PluginData, PluginData>> {
+    fn new_store(&self, config: PluginConfig) -> Store<Context<PluginData, PluginData>> {
         Store::new(
             &self.engine,
             Context {
                 wasi: default_wasi(),
                 imports: PluginData::default(),
                 exports: PluginData::default(),
-                runtime: PluginRuntime {},
+                runtime: PluginRuntime { config },
             },
         )
     }
 
     // invokes the plugin and gets the output from it
     #[instrument]
-    pub fn invoke<'a>(
-        &mut self,
-        input: String,
-        config: Option<&PluginConfig>,
-    ) -> Result<String, WasmError> {
-        let mut store = self.new_store();
+    pub fn invoke<'a>(&mut self, input: String, config: PluginConfig) -> Result<String, WasmError> {
+        let mut store = self.new_store(config);
         let (plugin, _instance) =
             Plugin::instantiate(&mut store, &self.module, &mut self.linker, |cx| {
                 &mut cx.exports
