@@ -179,7 +179,12 @@ mod tests {
             headers: "bc=1&ac=2",
         };
 
-        let mut runtime = PluginRuntime {};
+        let mut runtime = PluginRuntime {
+            config: PluginConfig {
+                name: "TestPlugin".to_string(),
+                allowed_env_vars: None,
+            },
+        };
         let response = runtime.http(req);
 
         assert_eq!(200, response.status)
