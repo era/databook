@@ -1,4 +1,5 @@
 use crate::http::{build_http_url, http_headers_from_str, http_headers_to_str};
+use crate::plugin_config::PluginConfig;
 use crossbeam::channel;
 use hyper::client::HttpConnector;
 use hyper::{Body, Client, HeaderMap, Method, Request, Response, Uri};
@@ -89,7 +90,11 @@ impl WasmModule {
 
     // invokes the plugin and gets the output from it
     #[instrument]
-    pub fn invoke(&mut self, input: String) -> Result<String, WasmError> {
+    pub fn invoke<'a>(
+        &mut self,
+        input: String,
+        config: Option<&PluginConfig>,
+    ) -> Result<String, WasmError> {
         let mut store = self.new_store();
         let (plugin, _instance) =
             Plugin::instantiate(&mut store, &self.module, &mut self.linker, |cx| {

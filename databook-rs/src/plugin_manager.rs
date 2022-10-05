@@ -53,7 +53,7 @@ impl Plugin {
 
     pub fn invoke(&mut self, input: String) -> Result<String, InvocationError> {
         self.wasm
-            .invoke(input)
+            .invoke(input, None)
             .map_err(|_| InvocationError::GenericError)
     }
 }
