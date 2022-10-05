@@ -1,5 +1,5 @@
-wit_bindgen_rust::export!("../../../wit/plugin.wit");
-wit_bindgen_rust::import!("../../../wit/runtime.wit");
+wit_bindgen_guest_rust::export!("../../../wit/plugin.wit");
+wit_bindgen_guest_rust::import!("../../../wit/runtime.wit");
 
 struct Plugin;
 

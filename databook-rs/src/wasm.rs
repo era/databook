@@ -8,10 +8,12 @@ use std::str;
 use tokio;
 use tracing::instrument;
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
-use wit_bindgen_wasmtime::wasmtime::{self, Config, Engine, Instance, Linker, Module, Store}; // 0.1.25
+use wit_bindgen_host_wasmtime_rust::wasmtime::{
+    self, Config, Engine, Instance, Linker, Module, Store,
+}; // 0.1.25
 
-wit_bindgen_wasmtime::import!("../wit/plugin.wit");
-wit_bindgen_wasmtime::export!("../wit/runtime.wit");
+wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
+wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
 use runtime::{add_to_linker, HttpRequest, HttpResponse, Runtime};
 
@@ -98,7 +100,10 @@ impl WasmModule {
             Plugin::instantiate(&mut store, &self.module, &mut self.linker, |cx| {
                 &mut cx.exports
             })
-            .map_err(|e| WasmError::GenericError(e.to_string()))?;
+            .map_err(|e| {
+                tracing::error!("error while instantiating plugin {:?}", e);
+                WasmError::GenericError(e.to_string())
+            })?;
 
         plugin
             .invoke(&mut store, &input)
