@@ -16,6 +16,8 @@ To learn a bit of wasm and rust
 
 ### databook-rs
 
+(**current you need rust nightly to build the project**)
+
 Databook-rs is the brain behind the backend wasm plugins, it's a simple runtime platform that responds to the inputs from users selecting the appropriate plugin. `databook-rs/examples/plugins` contain examples of how the plugins must be written. While `plugins` contain some of those examples compiled down to wasm already. 
 
 Databook-rs exposes a grpc service. The plugins are loaded from a specific folder. Plugins are made of a `config.toml` and a `plugin.wasm`. The `plugin.wasm` must conform with `wit/plugin.wit` interface, you can use wit-bindgen to generate the boilerplate code. The runtime exposes to all the plugins `wit/runtime.wit` (e.g. http_request methods, env variables). The `config.toml` must specify which env variables it want access to, and only those will be given to the service (e.g. for credentials, options and so on).
