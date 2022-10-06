@@ -281,7 +281,7 @@ mod tests {
             },
         };
 
-        assert!(runtime.is_domain_allowed("https://google.com"));
+        assert!(runtime.is_domain_allowed("https://google.com/something"));
         assert!(!runtime.is_domain_allowed("https://bing.com"));
     }
 
