@@ -3,6 +3,7 @@ use crate::plugin_config::PluginConfig;
 use crossbeam::channel;
 use hyper::client::HttpConnector;
 use hyper::{Body, Client, HeaderMap, Method, Request, Response, Uri};
+use std::env;
 use std::fmt;
 use std::str;
 use tokio;
@@ -142,8 +143,30 @@ impl runtime::Runtime for PluginRuntime {
     }
 
     fn env(&mut self, key: &str) -> Result<String, Error> {
-        //TODO if allowed get the value of key
-        Ok("".to_string())
+        if self.is_env_var_allowed(key) {
+            env::var(key).map_err(|e| Error {
+                code: 0,
+                message: e.to_string(),
+            })
+        } else {
+            Err(Error {
+                code: 0,
+                message: format!(
+                    "Key {:?} is not readable for plugin {:?}",
+                    key, self.config.name
+                ),
+            })
+        }
+    }
+}
+
+impl PluginRuntime {
+    fn is_env_var_allowed(&self, value: &str) -> bool {
+        if let Some(ref allowed_vars) = self.config.allowed_env_vars {
+            allowed_vars.iter().find(|&i| i == value).is_some()
+        } else {
+            false
+        }
     }
 }
 
@@ -219,5 +242,34 @@ mod tests {
         };
 
         assert_eq!(200, response.status)
+    }
+
+    #[test]
+    fn test_is_allowed_env_var() {
+        let runtime = PluginRuntime {
+            config: PluginConfig {
+                name: "TestPlugin".to_string(),
+                allowed_env_vars: Some(vec!["TEST".to_string()]),
+                allowed_domains: None,
+            },
+        };
+
+        assert!(!runtime.is_env_var_allowed("TEST1"));
+
+        assert!(runtime.is_env_var_allowed("TEST"));
+    }
+
+    #[test]
+    fn test_read_env_var() {
+        let mut runtime = PluginRuntime {
+            config: PluginConfig {
+                name: "TestPlugin".to_string(),
+                allowed_env_vars: Some(vec!["TEST".to_string()]),
+                allowed_domains: None,
+            },
+        };
+        env::set_var("TEST", "VAL");
+
+        assert_eq!("VAL".to_string(), runtime.env("TEST").unwrap());
     }
 }
