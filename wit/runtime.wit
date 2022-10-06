@@ -1,3 +1,8 @@
+record error {
+    code: u16,
+    message: string,
+  }
+
 record http-request {
     method: string,
     url: string,
@@ -12,6 +17,6 @@ record http-response {
     response: string,
 }
 
-http: func(request: http-request) -> http-response
+http: func(request: http-request) -> result<http-response, error>
 
-env: func(key: string) -> string
+env: func(key: string) -> result<string, error>

@@ -15,7 +15,7 @@ use wit_bindgen_host_wasmtime_rust::wasmtime::{
 wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
 wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
-use runtime::{add_to_linker, HttpRequest, HttpResponse, Runtime};
+use runtime::{add_to_linker, Error, HttpRequest, HttpResponse, Runtime};
 
 pub struct PluginRuntime {
     config: PluginConfig,
@@ -112,7 +112,7 @@ impl WasmModule {
 }
 
 impl runtime::Runtime for PluginRuntime {
-    fn http(&mut self, request: HttpRequest) -> HttpResponse {
+    fn http(&mut self, request: HttpRequest) -> Result<HttpResponse, Error> {
         //TODO VALIDATION
 
         let req = Request::builder()
@@ -129,12 +129,12 @@ impl runtime::Runtime for PluginRuntime {
         let response = rx.recv().unwrap();
 
         rt.shutdown_background();
-        response
+        Ok(response)
     }
 
-    fn env(&mut self, key: &str) -> String {
+    fn env(&mut self, key: &str) -> Result<String, Error> {
         //TODO if allowed get the value of key
-        "".to_string()
+        Ok("".to_string())
     }
 }
 
@@ -191,7 +191,11 @@ mod tests {
                 allowed_domains: Some(vec![mock_server.uri().clone()]),
             },
         };
-        let response = runtime.http(req);
+
+        let response = match runtime.http(req) {
+            Ok(response) => response,
+            _ => panic!("http request failed"),
+        };
 
         assert_eq!(200, response.status)
     }
