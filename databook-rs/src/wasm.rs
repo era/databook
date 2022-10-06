@@ -272,6 +272,20 @@ mod tests {
     }
 
     #[test]
+    fn test_is_domain_allowed() {
+        let mut runtime = PluginRuntime {
+            config: PluginConfig {
+                name: "TestPlugin".to_string(),
+                allowed_env_vars: None,
+                allowed_domains: Some(vec!["google.com".to_string()]),
+            },
+        };
+
+        assert!(runtime.is_domain_allowed("https://google.com"));
+        assert!(!runtime.is_domain_allowed("https://bing.com"));
+    }
+
+    #[test]
     fn test_is_allowed_env_var() {
         let runtime = PluginRuntime {
             config: PluginConfig {
