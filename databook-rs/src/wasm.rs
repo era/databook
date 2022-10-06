@@ -17,6 +17,9 @@ wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
 use runtime::{add_to_linker, Error, HttpRequest, HttpResponse, Runtime};
 
+const HTTP_REQUEST_FAILED: u16 = 100;
+const HTTP_INVALID_BODY: u16 = 101;
+
 pub struct PluginRuntime {
     config: PluginConfig,
 }
@@ -119,17 +122,23 @@ impl runtime::Runtime for PluginRuntime {
             .uri(build_http_url(request.url, request.params))
             .method(request.method);
         let req = http_headers_from_str(request.headers, req);
-        let req = req.body(Body::from(request.body.to_string())).unwrap(); //TODO
+
+        let req = req
+            .body(Body::from(request.body.to_string()))
+            .map_err(|e| Error {
+                code: HTTP_INVALID_BODY,
+                message: e.to_string(),
+            })?;
 
         //TODO ASYNC / SYNC BRIDGE
         let (tx, rx) = channel::bounded(1);
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = tokio::runtime::Runtime::new().expect("Could not start a new Tokio runtime");
         let handle = rt.handle();
         handle.spawn(async move { tx.send(do_request(req).await) });
         let response = rx.recv().unwrap();
 
         rt.shutdown_background();
-        Ok(response)
+        response
     }
 
     fn env(&mut self, key: &str) -> Result<String, Error> {
@@ -138,25 +147,37 @@ impl runtime::Runtime for PluginRuntime {
     }
 }
 
-pub async fn do_request(request: Request<hyper::Body>) -> HttpResponse {
+pub async fn do_request(request: Request<hyper::Body>) -> Result<HttpResponse, Error> {
     let client: Client<HttpConnector, hyper::Body> = Client::new();
 
     tracing::info!("doing http request {:?}", request);
-    let response = client.request(request).await.unwrap();
+
+    let response = client.request(request).await.map_err(|e| Error {
+        code: HTTP_REQUEST_FAILED,
+        message: e.to_string(),
+    })?;
+
     tracing::info!("http response is {:?}", response);
 
     let status = response.status().as_u16();
     //TODO check status code
     let headers = http_headers_to_str(response.headers().clone()); //TODO
 
-    let response_body = hyper::body::to_bytes(response.into_body()).await.unwrap();
-    let response_body = String::from_utf8(response_body.into_iter().collect()).expect("");
+    let response_body = hyper::body::to_bytes(response.into_body())
+        .await
+        .map_err(|e| Error {
+            code: HTTP_REQUEST_FAILED,
+            message: e.to_string(),
+        })?;
 
-    HttpResponse {
+    let response_body = String::from_utf8(response_body.into_iter().collect())
+        .expect("could not collect response body to convert to string");
+
+    Ok(HttpResponse {
         status,
         headers,
         response: response_body,
-    }
+    })
 }
 
 #[cfg(test)]
