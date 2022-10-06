@@ -69,10 +69,10 @@ pub struct PluginManager {
 
 impl PluginManager {
     pub fn new(folder: std::path::PathBuf) -> Self {
-        return Self {
+        Self {
             folder,
             plugins: HashMap::new(),
-        };
+        }
     }
 
     pub fn registry(&mut self) -> Result<(), PluginError> {

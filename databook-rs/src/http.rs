@@ -13,7 +13,7 @@ pub fn http_headers_from_str(
     for header in splitted {
         let header: Vec<&str> = header.split('=').collect();
 
-        match (header.get(0), header.get(1)) {
+        match (header.first(), header.get(1)) {
             (Some(key), Some(value)) => {
                 req = req.header(
                     key.to_string().parse::<HeaderName>().unwrap(),
@@ -23,7 +23,7 @@ pub fn http_headers_from_str(
             _ => continue,
         };
     }
-    return req;
+    req
 }
 
 pub fn http_headers_to_str(header_map: HeaderMap) -> String {

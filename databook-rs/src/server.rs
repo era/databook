@@ -1,4 +1,4 @@
-use async_trait::async_trait;
+
 use clap::Parser;
 use databook::databook_server::{Databook, DatabookServer};
 use databook::{GetRequest, GetResponse};

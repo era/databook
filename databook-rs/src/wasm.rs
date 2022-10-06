@@ -2,17 +2,15 @@ use crate::http::{build_http_url, http_headers_from_str, http_headers_to_str};
 use crate::plugin_config::PluginConfig;
 use crossbeam::channel;
 use hyper::client::HttpConnector;
-use hyper::{Body, Client, HeaderMap, Method, Request, Response, Uri};
+use hyper::{Body, Client, Request};
 use std::env;
 use std::fmt;
 use std::str;
-use tokio;
+
 use tracing::instrument;
-use url::{Host, ParseError, Url};
-use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
-use wit_bindgen_host_wasmtime_rust::wasmtime::{
-    self, Config, Engine, Instance, Linker, Module, Store,
-}; // 0.1.25
+use url::{Host, Url};
+
+use wit_bindgen_host_wasmtime_rust::wasmtime::{Engine, Linker, Module, Store}; // 0.1.25
 
 wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
 wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
@@ -176,8 +174,7 @@ impl PluginRuntime {
                     if let Some(host) = url.host() {
                         allowed_domain
                             .iter()
-                            .find(|&i| Host::parse(i).unwrap() == host)
-                            .is_some()
+                            .any(|i| Host::parse(i).unwrap() == host)
                     } else {
                         false
                     }
@@ -190,7 +187,7 @@ impl PluginRuntime {
     }
     fn is_env_var_allowed(&self, value: &str) -> bool {
         if let Some(ref allowed_vars) = self.config.allowed_env_vars {
-            allowed_vars.iter().find(|&i| i == value).is_some()
+            allowed_vars.iter().any(|i| i == value)
         } else {
             false
         }

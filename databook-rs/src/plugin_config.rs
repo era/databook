@@ -1,8 +1,8 @@
 use serde::Deserialize;
 use std::fs;
-use toml;
 
-#[derive(Debug, Deserialize, PartialEq, Clone)]
+
+#[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct PluginConfig {
     pub name: String,
     pub allowed_env_vars: Option<Vec<String>>,
@@ -20,7 +20,7 @@ impl PluginConfig {
         }
     }
     pub fn new_from_str(config: &str) -> Option<Self> {
-        match toml::from_str::<PluginConfig>(&config) {
+        match toml::from_str::<PluginConfig>(config) {
             Ok(config) => Some(config),
             Err(e) => {
                 tracing::warn!("unable to parse config file {:?}", e);
