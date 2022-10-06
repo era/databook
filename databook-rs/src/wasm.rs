@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_is_domain_allowed() {
-        let mut runtime = PluginRuntime {
+        let runtime = PluginRuntime {
             config: PluginConfig {
                 name: "TestPlugin".to_string(),
                 allowed_env_vars: None,
