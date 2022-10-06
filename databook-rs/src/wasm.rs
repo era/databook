@@ -30,7 +30,6 @@ struct Context<I, E> {
     exports: E,
     runtime: PluginRuntime,
 }
-type PluginStore = Store<Context<PluginData, PluginData>>;
 
 #[derive(Debug)]
 pub enum WasmError {
