@@ -8,6 +8,7 @@ use std::fmt;
 use std::str;
 use tokio;
 use tracing::instrument;
+use url::{Host, ParseError, Url};
 use wasmtime_wasi::{sync::WasiCtxBuilder, WasiCtx};
 use wit_bindgen_host_wasmtime_rust::wasmtime::{
     self, Config, Engine, Instance, Linker, Module, Store,
@@ -117,8 +118,15 @@ impl WasmModule {
 
 impl runtime::Runtime for PluginRuntime {
     fn http(&mut self, request: HttpRequest) -> Result<HttpResponse, Error> {
-        //TODO VALIDATION
-
+        if !self.is_domain_allowed(request.url) {
+            return Err(Error {
+                code: 0,
+                message: format!(
+                    "URL {:?} is not allowed, please add it to the allowed_domains",
+                    request.url
+                ),
+            });
+        }
         let req = Request::builder()
             .uri(build_http_url(request.url, request.params))
             .method(request.method);
@@ -161,6 +169,25 @@ impl runtime::Runtime for PluginRuntime {
 }
 
 impl PluginRuntime {
+    fn is_domain_allowed(&self, domain: &str) -> bool {
+        if let Some(ref allowed_domain) = self.config.allowed_domains {
+            match Url::parse(domain) {
+                Ok(url) => {
+                    if let Some(host) = url.host() {
+                        allowed_domain
+                            .iter()
+                            .find(|&i| Host::parse(i).unwrap() == host)
+                            .is_some()
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            }
+        } else {
+            false
+        }
+    }
     fn is_env_var_allowed(&self, value: &str) -> bool {
         if let Some(ref allowed_vars) = self.config.allowed_env_vars {
             allowed_vars.iter().find(|&i| i == value).is_some()
@@ -232,13 +259,13 @@ mod tests {
             config: PluginConfig {
                 name: "TestPlugin".to_string(),
                 allowed_env_vars: None,
-                allowed_domains: Some(vec![mock_server.uri().clone()]),
+                allowed_domains: Some(vec!["127.0.0.1".to_string()]),
             },
         };
 
         let response = match runtime.http(req) {
             Ok(response) => response,
-            _ => panic!("http request failed"),
+            Err(e) => panic!("http request failed: {:?}", e),
         };
 
         assert_eq!(200, response.status)

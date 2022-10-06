@@ -30,6 +30,7 @@ wit-bindgen-host-wasmtime-rust = { git = "https://github.com/bytecodealliance/wi
 once_cell = "1.13.0"
 hyper = { version = "0.14", features = ["full"] }
 crossbeam = "0.8.2"
+url = "2.3.1"
 [build-dependencies]
 tonic-build = "0.7"
 
