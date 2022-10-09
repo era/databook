@@ -1,4 +1,4 @@
-use crate::http::{build_http_url, http_headers_from_str, http_headers_to_str};
+use crate::http::{build_http_url, http_headers_from_runtime, http_headers_to_runtime};
 use crate::plugin_config::PluginConfig;
 use crossbeam::channel;
 use hyper::client::HttpConnector;
@@ -15,7 +15,7 @@ use wit_bindgen_host_wasmtime_rust::wasmtime::{Engine, Linker, Module, Store}; /
 wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
 wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
-use runtime::{add_to_linker, Error, HttpRequest, HttpResponse, Runtime};
+use runtime::{add_to_linker, Error, HttpRequest, HttpResponse, HttpHeaderParam, Runtime};
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 const HTTP_INVALID_BODY: u16 = 101;
@@ -124,10 +124,13 @@ impl runtime::Runtime for PluginRuntime {
                 ),
             });
         }
+
         let req = Request::builder()
             .uri(build_http_url(request.url, request.params))
             .method(request.method);
-        let req = http_headers_from_str(request.headers, req);
+
+        let req_headers: Vec<HttpHeaderParam> = request.headers;
+        let req = http_headers_from_runtime(&req_headers, req);
 
         let req = req
             .body(Body::from(request.body.to_string()))
@@ -207,7 +210,7 @@ pub async fn do_request(request: Request<hyper::Body>) -> Result<HttpResponse, E
 
     let status = response.status().as_u16();
     //TODO check status code
-    let headers = http_headers_to_str(response.headers().clone()); //TODO
+    let headers = http_headers_to_runtime(response.headers().clone());
 
     let response_body = hyper::body::to_bytes(response.into_body())
         .await
@@ -248,7 +251,10 @@ mod tests {
             url: &mock_server.uri(),
             params: "test=a",
             body: "{}",
-            headers: "bc=1&ac=2",
+            headers: [ 
+                HttpHeaderParam { key: "bc", value: "1"}, 
+                HttpHeaderParam { key: "ac", value: "2"}, 
+                ].to_vec(),
         };
 
         let mut runtime = PluginRuntime {

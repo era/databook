@@ -1,2 +1,3 @@
 name = "hello_world"
 allowed_env_vars = ["TEST", "APP_NAME"]
+allowed_domains = ["google.com"]

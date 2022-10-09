@@ -1,19 +1,24 @@
 record error {
     code: u16,
     message: string,
-  }
+}
+
+record http-header {
+    key: string,
+    value: string
+}
 
 record http-request {
     method: string,
     url: string,
     params: string,
     body: string,
-    headers: string
+    headers: list<http-header>
 }
 
 record http-response {
     status: u16,
-    headers: string,
+    headers: list<http-header>,
     response: string,
 }
 
