@@ -1,6 +1,6 @@
-use crate::http::{build_http_url, http_headers_from_str, http_headers_to_str};
 use crate::plugin_config::PluginConfig;
 use hyper::client::HttpConnector;
+use hyper::header::{HeaderMap, HeaderName, HeaderValue};
 use hyper::{Body, Client, Request};
 use std::env;
 use std::fmt;
@@ -14,7 +14,7 @@ use wit_bindgen_host_wasmtime_rust::wasmtime::{Engine, Linker, Module, Store}; /
 wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
 wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
-use runtime::{add_to_linker, Error, HttpRequest, HttpResponse, Runtime};
+use runtime::{add_to_linker, Error, HttpRequest, HttpResponse, HttpHeaderParam, HttpHeaderResult, Runtime};
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 const HTTP_INVALID_BODY: u16 = 101;
@@ -123,10 +123,13 @@ impl runtime::Runtime for PluginRuntime {
                 ),
             });
         }
+
         let req = Request::builder()
             .uri(build_http_url(request.url, request.params))
             .method(request.method);
-        let req = http_headers_from_str(request.headers, req);
+
+        let req_headers: Vec<HttpHeaderParam> = request.headers;
+        let req = http_headers_from_runtime(&req_headers, req);
 
         let req = req
             .body(Body::from(request.body.to_string()))
@@ -202,7 +205,7 @@ pub async fn do_request(request: Request<hyper::Body>) -> Result<HttpResponse, E
 
     let status = response.status().as_u16();
     //TODO check status code
-    let headers = http_headers_to_str(response.headers().clone()); //TODO
+    let headers = http_headers_to_runtime(response.headers().clone());
 
     let response_body = hyper::body::to_bytes(response.into_body())
         .await
@@ -221,11 +224,42 @@ pub async fn do_request(request: Request<hyper::Body>) -> Result<HttpResponse, E
     })
 }
 
+
+fn build_http_url(uri: &str, params: &str) -> String {
+    format!("{}?{}", uri, params)
+}
+
+fn http_headers_from_runtime(
+    headers: &Vec<HttpHeaderParam>,
+    mut req: hyper::http::request::Builder,
+) -> hyper::http::request::Builder {
+    for header in headers {
+        req = req.header(
+            header.key.parse::<HeaderName>().unwrap(), 
+            header.value.to_string().parse::<HeaderValue>().unwrap(),
+        )
+    }
+    req
+}
+
+fn http_headers_to_runtime(header_map: HeaderMap) -> Vec<HttpHeaderResult> {
+    let mut runtime_headers = Vec::<HttpHeaderResult>::new();
+    for (key, value) in header_map {
+        let runtime_header = HttpHeaderResult { 
+            key: key.unwrap().as_str().into(), 
+            value: value.to_str().unwrap().into() 
+        };
+        runtime_headers.push(runtime_header);
+    }
+    runtime_headers
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
+    use hyper::http::request::Builder;
 
     #[test]
     fn test_runtime_http() {
@@ -243,7 +277,10 @@ mod tests {
             url: &mock_server.uri(),
             params: "test=a",
             body: "{}",
-            headers: "bc=1&ac=2",
+            headers: [ 
+                HttpHeaderParam { key: "bc", value: "1"}, 
+                HttpHeaderParam { key: "ac", value: "2"}, 
+                ].to_vec(),
         };
 
         let mut runtime = PluginRuntime {
@@ -303,5 +340,60 @@ mod tests {
         env::set_var("TEST", "VAL");
 
         assert_eq!("VAL".to_string(), runtime.env("TEST").unwrap());
+    }
+
+    impl PartialEq for HttpHeaderResult {
+        fn eq(&self, other: &Self) -> bool {
+            self.key == other.key && self.value == other.value
+        }
+    }
+
+    #[test]
+    fn test_build_http_url() {
+        let url = build_http_url("http://www.elias.sh/", "ab=1&aa=2");
+        assert_eq!(url, "http://www.elias.sh/?ab=1&aa=2");
+    }
+
+    #[test]
+    fn test_http_headers_from_runtime() {
+        let mut headers = Vec::<HttpHeaderParam>::new();
+        headers.push(HttpHeaderParam { key: "content", value: "x" });
+        headers.push(HttpHeaderParam { key: "something", value: "y" });
+
+        let mut header_map = HeaderMap::new();
+        header_map.insert(
+            "content".to_string().parse::<HeaderName>().unwrap(),
+            "x".to_string().parse::<HeaderValue>().unwrap(),
+        );
+        header_map.insert(
+            "something".to_string().parse::<HeaderName>().unwrap(),
+            "y".to_string().parse::<HeaderValue>().unwrap(),
+        );
+
+        assert_eq!(
+            &header_map,
+            http_headers_from_runtime(&headers, Builder::new())
+                .headers_ref()
+                .unwrap()
+        )
+    }
+
+    #[test]
+    fn test_http_headers_to_runtime() {
+        let mut header_map = HeaderMap::new();
+        header_map.insert(
+            "content".to_string().parse::<HeaderName>().unwrap(),
+            "x".to_string().parse::<HeaderValue>().unwrap(),
+        );
+        header_map.insert(
+            "something".to_string().parse::<HeaderName>().unwrap(),
+            "y".to_string().parse::<HeaderValue>().unwrap(),
+        );
+
+        assert_eq!([ 
+            HttpHeaderResult { key: "content".to_string(), value: "x".to_string()}, 
+            HttpHeaderResult { key: "something".to_string(), value: "y".to_string()}
+            ].to_vec(), 
+            http_headers_to_runtime(header_map))
     }
 }

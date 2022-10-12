@@ -8,7 +8,6 @@ use tonic::transport::Server;
 use tonic::{Code, Request, Response, Status};
 use tracing::instrument;
 
-mod http;
 mod plugin_config;
 mod plugin_manager;
 mod wasm;
