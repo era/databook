@@ -3,7 +3,7 @@ use databook::databook_server::{Databook, DatabookServer};
 use databook::{GetRequest, GetResponse};
 use once_cell::sync::OnceCell;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::RwLock;
 use tonic::transport::Server;
 use tonic::{Code, Request, Response, Status};
 use tracing::instrument;
@@ -17,7 +17,7 @@ pub mod databook {
     tonic::include_proto!("databook");
 }
 
-static PLUGINS: OnceCell<Mutex<plugin_manager::PluginManager>> = OnceCell::new();
+static PLUGINS: OnceCell<RwLock<plugin_manager::PluginManager>> = OnceCell::new();
 
 // CLI arguments to start the server
 #[derive(Parser, Debug)]
@@ -46,7 +46,7 @@ impl Databook for DatabookGrpc {
         tracing::info!("received get request");
         let response = match PLUGINS.get() {
             Some(p) => p
-                .lock()
+                .read()
                 .map_err(|e| {
                     tracing::error!("Could not get lock for plugins object {:?}", e);
                     Status::new(Code::Internal, "Internal Error")
