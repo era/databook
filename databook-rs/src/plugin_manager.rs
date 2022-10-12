@@ -51,7 +51,7 @@ impl Plugin {
         }
     }
 
-    pub fn invoke(&mut self, input: String) -> Result<String, InvocationError> {
+    pub fn invoke(&self, input: String) -> Result<String, InvocationError> {
         self.wasm
             .invoke(input, self.config.clone())
             .map_err(|_| InvocationError::GenericError)
@@ -91,9 +91,9 @@ impl PluginManager {
     }
 
     // invokes the plugin using wasm
-    pub fn invoke(&mut self, plugin_name: &str, input: String) -> Result<String, InvocationError> {
+    pub fn invoke(&self, plugin_name: &str, input: String) -> Result<String, InvocationError> {
         self.plugins
-            .get_mut(plugin_name)
+            .get(plugin_name)
             .map_or(Err(InvocationError::PluginDoesNotExist), |p| {
                 p.invoke(input)
             })

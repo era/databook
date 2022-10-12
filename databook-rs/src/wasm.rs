@@ -96,10 +96,10 @@ impl WasmModule {
 
     // invokes the plugin and gets the output from it
     #[instrument]
-    pub fn invoke<'a>(&mut self, input: String, config: PluginConfig) -> Result<String, WasmError> {
+    pub fn invoke<'a>(&self, input: String, config: PluginConfig) -> Result<String, WasmError> {
         let mut store = self.new_store(config);
         let (plugin, _instance) =
-            Plugin::instantiate(&mut store, &self.module, &mut self.linker, |cx| {
+            Plugin::instantiate(&mut store, &self.module, &mut self.linker.clone(), |cx| {
                 &mut cx.exports
             })
             .map_err(|e| {

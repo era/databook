@@ -1,4 +1,3 @@
-
 use clap::Parser;
 use databook::databook_server::{Databook, DatabookServer};
 use databook::{GetRequest, GetResponse};
@@ -48,12 +47,15 @@ impl Databook for DatabookGrpc {
         let response = match PLUGINS.get() {
             Some(p) => p
                 .lock()
-                .unwrap() //TODO
+                .map_err(|e| {
+                    tracing::error!("Could not get lock for plugins object {:?}", e);
+                    Status::new(Code::Internal, "Internal Error")
+                })?
                 .invoke(&request.into_inner().name, "sample_input".to_string())
                 .map_err(|e| {
                     tracing::error!("error while calling wasm plugin {:?}", e);
                     Status::new(Code::Internal, "Internal Error")
-                }), //TODO
+                }),
             None => Err(Status::new(Code::Internal, "No plugins setup")),
         }?;
 
@@ -70,7 +72,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let mut plugin_manager = plugin_manager::PluginManager::new(PathBuf::from(args.plugin_folder));
-    plugin_manager.registry(); //TODO check error
+    plugin_manager
+        .registry()
+        .expect("could not register plugins");
+
     PLUGINS
         .set(Mutex::new(plugin_manager))
         .expect("should always add plugin manager to once_cell");
