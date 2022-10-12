@@ -77,7 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("could not register plugins");
 
     PLUGINS
-        .set(Mutex::new(plugin_manager))
+        .set(RwLock::new(plugin_manager))
         .expect("should always add plugin manager to once_cell");
     // Setups GRPC server
     let addr = args.address_to_listen.parse()?;
