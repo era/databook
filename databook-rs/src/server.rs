@@ -64,6 +64,12 @@ impl Databook for DatabookGrpc {
     }
 }
 
+impl Default for DatabookGrpc {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
