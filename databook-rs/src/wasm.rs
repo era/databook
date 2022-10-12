@@ -135,10 +135,9 @@ impl runtime::Runtime for PluginRuntime {
                 message: e.to_string(),
             })?;
 
-        let rt = tokio::runtime::Runtime::new().expect("Could not start a new Tokio runtime");
-        let response = rt.block_on(async move { do_request(req).await });
+        let handle = tokio::runtime::Handle::current();
+        let response = handle.block_on(async move { do_request(req).await });
 
-        rt.shutdown_background();
         response
     }
 
@@ -227,8 +226,8 @@ mod tests {
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    #[test]
-    fn test_runtime_http() {
+    #[tokio::test]
+    async fn test_runtime_http() {
         let mock_server = tokio_test::block_on(MockServer::start());
         tokio_test::block_on(
             Mock::given(method("GET"))
