@@ -21,25 +21,29 @@ struct Plugin {
 }
 
 impl Plugin {
+    // new_from_folder returns a Plugin if a valid config.toml and plugin.wasm
+    // can be found on the folder. If it cannot it will return None.
     pub fn new_from_folder(path: std::path::PathBuf) -> Option<Self> {
-        let config = path.join("config.toml");
+        let config_file = path.join("config.toml");
 
-        if !config.is_file() {
+        if !config_file.is_file() {
             tracing::info!("no config file found, ignoring");
             return None;
         }
 
-        let wasm = path.join("plugin.wasm");
+        let wasm_path = path.join("plugin.wasm");
 
-        if !wasm.is_file() {
+        if !wasm_path.is_file() {
             tracing::info!("no wasm file found, ignoring");
             return None;
         }
 
-        let config = PluginConfig::new_from_file(config);
-        let wasm = match WasmModule::new(wasm.to_str().unwrap()) {
+        let config = PluginConfig::new_from_file(config_file);
+
+        // loads the wasm module from the wasm_path
+        let wasm = match WasmModule::new(wasm_path.to_str().unwrap()) {
             Ok(wasm) => wasm,
-            Err(_) => return None, //TODO
+            Err(_) => return None,
         };
 
         match config {
@@ -51,7 +55,9 @@ impl Plugin {
         }
     }
 
-    pub fn invoke(&mut self, input: String) -> Result<String, InvocationError> {
+    // instantiate the wasm module and calls (exported) invoke function
+    // passing the input to it
+    pub fn invoke(&self, input: String) -> Result<String, InvocationError> {
         self.wasm
             .invoke(input, self.config.clone())
             .map_err(|_| InvocationError::GenericError)
@@ -91,9 +97,9 @@ impl PluginManager {
     }
 
     // invokes the plugin using wasm
-    pub fn invoke(&mut self, plugin_name: &str, input: String) -> Result<String, InvocationError> {
+    pub fn invoke(&self, plugin_name: &str, input: String) -> Result<String, InvocationError> {
         self.plugins
-            .get_mut(plugin_name)
+            .get(plugin_name)
             .map_or(Err(InvocationError::PluginDoesNotExist), |p| {
                 p.invoke(input)
             })

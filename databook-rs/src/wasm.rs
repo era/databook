@@ -1,5 +1,4 @@
 use crate::plugin_config::PluginConfig;
-use crossbeam::channel;
 use hyper::client::HttpConnector;
 use hyper::header::{HeaderMap, HeaderName, HeaderValue};
 use hyper::{Body, Client, Request};
@@ -96,10 +95,10 @@ impl WasmModule {
 
     // invokes the plugin and gets the output from it
     #[instrument]
-    pub fn invoke<'a>(&mut self, input: String, config: PluginConfig) -> Result<String, WasmError> {
+    pub fn invoke<'a>(&self, input: String, config: PluginConfig) -> Result<String, WasmError> {
         let mut store = self.new_store(config);
         let (plugin, _instance) =
-            Plugin::instantiate(&mut store, &self.module, &mut self.linker, |cx| {
+            Plugin::instantiate(&mut store, &self.module, &mut self.linker.clone(), |cx| {
                 &mut cx.exports
             })
             .map_err(|e| {
@@ -139,12 +138,8 @@ impl runtime::Runtime for PluginRuntime {
                 message: e.to_string(),
             })?;
 
-        //TODO ASYNC / SYNC BRIDGE
-        let (tx, rx) = channel::bounded(1);
         let rt = tokio::runtime::Runtime::new().expect("Could not start a new Tokio runtime");
-        let handle = rt.handle();
-        handle.spawn(async move { tx.send(do_request(req).await) });
-        let response = rx.recv().unwrap();
+        let response = rt.block_on(async move { do_request(req).await });
 
         rt.shutdown_background();
         response

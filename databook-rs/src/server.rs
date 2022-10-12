@@ -1,10 +1,9 @@
-
 use clap::Parser;
 use databook::databook_server::{Databook, DatabookServer};
 use databook::{GetRequest, GetResponse};
 use once_cell::sync::OnceCell;
 use std::path::PathBuf;
-use std::sync::Mutex;
+use std::sync::RwLock;
 use tonic::transport::Server;
 use tonic::{Code, Request, Response, Status};
 use tracing::instrument;
@@ -17,7 +16,7 @@ pub mod databook {
     tonic::include_proto!("databook");
 }
 
-static PLUGINS: OnceCell<Mutex<plugin_manager::PluginManager>> = OnceCell::new();
+static PLUGINS: OnceCell<RwLock<plugin_manager::PluginManager>> = OnceCell::new();
 
 // CLI arguments to start the server
 #[derive(Parser, Debug)]
@@ -46,18 +45,27 @@ impl Databook for DatabookGrpc {
         tracing::info!("received get request");
         let response = match PLUGINS.get() {
             Some(p) => p
-                .lock()
-                .unwrap() //TODO
+                .read()
+                .map_err(|e| {
+                    tracing::error!("Could not get lock for plugins object {:?}", e);
+                    Status::new(Code::Internal, "Internal Error")
+                })?
                 .invoke(&request.into_inner().name, "sample_input".to_string())
                 .map_err(|e| {
                     tracing::error!("error while calling wasm plugin {:?}", e);
                     Status::new(Code::Internal, "Internal Error")
-                }), //TODO
+                }),
             None => Err(Status::new(Code::Internal, "No plugins setup")),
         }?;
 
         let reply = GetResponse { output: response };
         Ok(Response::new(reply))
+    }
+}
+
+impl Default for DatabookGrpc {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -69,9 +77,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::subscriber::set_global_default(subscriber)?;
 
     let mut plugin_manager = plugin_manager::PluginManager::new(PathBuf::from(args.plugin_folder));
-    plugin_manager.registry(); //TODO check error
+    plugin_manager
+        .registry()
+        .expect("could not register plugins");
+
     PLUGINS
-        .set(Mutex::new(plugin_manager))
+        .set(RwLock::new(plugin_manager))
         .expect("should always add plugin manager to once_cell");
     // Setups GRPC server
     let addr = args.address_to_listen.parse()?;
