@@ -42,3 +42,8 @@ TODO explain
 - Fiberplane
 - https://github.com/masmullin2000/wit-bindgen-example/blob/main/host/src/main.rs
 - https://codeberg.org/era/malleable-checker 
+
+# Collaborators 
+- [Elias Jr](https://codeberg.org/era)
+- [Marcelo Jr](https://codeberg.org/marceloadsj1)
+- [Murilo Clemente](https://codeberg.org/muclemente)
