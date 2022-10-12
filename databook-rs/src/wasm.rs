@@ -1,4 +1,5 @@
 use crate::plugin_config::PluginConfig;
+use crossbeam::channel;
 use hyper::client::HttpConnector;
 use hyper::header::{HeaderMap, HeaderName, HeaderValue};
 use hyper::{Body, Client, Request};
@@ -138,8 +139,12 @@ impl runtime::Runtime for PluginRuntime {
                 message: e.to_string(),
             })?;
 
+        //TODO ASYNC / SYNC BRIDGE
+        let (tx, rx) = channel::bounded(1);
         let rt = tokio::runtime::Runtime::new().expect("Could not start a new Tokio runtime");
-        let response = rt.block_on(async move { do_request(req).await });
+        let handle = rt.handle();
+        handle.spawn(async move { tx.send(do_request(req).await) });
+        let response = rx.recv().unwrap();
 
         rt.shutdown_background();
         response
