@@ -226,39 +226,41 @@ mod tests {
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
-    #[tokio::test]
-    async fn test_runtime_http() {
-        let mock_server = tokio_test::block_on(MockServer::start());
-        tokio_test::block_on(
-            Mock::given(method("GET"))
-                .and(path("/"))
-                .respond_with(ResponseTemplate::new(200))
-                // Mounting the mock on the mock server - it's now effective!
-                .mount(&mock_server),
-        );
+    #[test]
+    fn test_runtime_http() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(async move {
+            let mock_server = tokio_test::block_on(MockServer::start());
+            tokio_test::block_on(
+                Mock::given(method("GET"))
+                    .and(path("/"))
+                    .respond_with(ResponseTemplate::new(200))
+                    // Mounting the mock on the mock server - it's now effective!
+                    .mount(&mock_server),
+            );
 
-        let req = HttpRequest {
-            method: "get".into(),
-            url: &mock_server.uri(),
-            params: "test=a",
-            body: "{}",
-            headers: "bc=1&ac=2",
-        };
+            let req = HttpRequest {
+                method: "get".into(),
+                url: &mock_server.uri(),
+                params: "test=a",
+                body: "{}",
+                headers: "bc=1&ac=2",
+            };
 
-        let mut runtime = PluginRuntime {
-            config: PluginConfig {
-                name: "TestPlugin".to_string(),
-                allowed_env_vars: None,
-                allowed_domains: Some(vec!["127.0.0.1".to_string()]),
-            },
-        };
+            let mut runtime = PluginRuntime {
+                config: PluginConfig {
+                    name: "TestPlugin".to_string(),
+                    allowed_env_vars: None,
+                    allowed_domains: Some(vec!["127.0.0.1".to_string()]),
+                },
+            };
+            let response = match runtime.http(req) {
+                Ok(response) => response,
+                Err(e) => panic!("http request failed: {:?}", e),
+            };
 
-        let response = match runtime.http(req) {
-            Ok(response) => response,
-            Err(e) => panic!("http request failed: {:?}", e),
-        };
-
-        assert_eq!(200, response.status)
+            assert_eq!(200, response.status);
+        });
     }
 
     #[test]
