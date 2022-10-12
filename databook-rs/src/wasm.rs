@@ -14,7 +14,9 @@ use wit_bindgen_host_wasmtime_rust::wasmtime::{Engine, Linker, Module, Store}; /
 wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
 wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
 use plugin::{Plugin, PluginData};
-use runtime::{add_to_linker, Error, HttpRequest, HttpResponse, HttpHeaderParam, HttpHeaderResult, Runtime};
+use runtime::{
+    add_to_linker, Error, HttpHeaderParam, HttpHeaderResult, HttpRequest, HttpResponse, Runtime,
+};
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 const HTTP_INVALID_BODY: u16 = 101;
@@ -138,10 +140,9 @@ impl runtime::Runtime for PluginRuntime {
                 message: e.to_string(),
             })?;
 
-        let rt = tokio::runtime::Runtime::new().expect("Could not start a new Tokio runtime");
-        let response = rt.block_on(async move { do_request(req).await });
+        let handle = tokio::runtime::Handle::current();
+        let response = handle.block_on(async move { do_request(req).await });
 
-        rt.shutdown_background();
         response
     }
 
@@ -224,7 +225,6 @@ pub async fn do_request(request: Request<hyper::Body>) -> Result<HttpResponse, E
     })
 }
 
-
 fn build_http_url(uri: &str, params: &str) -> String {
     format!("{}?{}", uri, params)
 }
@@ -235,7 +235,7 @@ fn http_headers_from_runtime(
 ) -> hyper::http::request::Builder {
     for header in headers {
         req = req.header(
-            header.key.parse::<HeaderName>().unwrap(), 
+            header.key.parse::<HeaderName>().unwrap(),
             header.value.to_string().parse::<HeaderValue>().unwrap(),
         )
     }
@@ -245,9 +245,9 @@ fn http_headers_from_runtime(
 fn http_headers_to_runtime(header_map: HeaderMap) -> Vec<HttpHeaderResult> {
     let mut runtime_headers = Vec::<HttpHeaderResult>::new();
     for (key, value) in header_map {
-        let runtime_header = HttpHeaderResult { 
-            key: key.unwrap().as_str().into(), 
-            value: value.to_str().unwrap().into() 
+        let runtime_header = HttpHeaderResult {
+            key: key.unwrap().as_str().into(),
+            value: value.to_str().unwrap().into(),
         };
         runtime_headers.push(runtime_header);
     }
@@ -257,46 +257,55 @@ fn http_headers_to_runtime(header_map: HeaderMap) -> Vec<HttpHeaderResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hyper::http::request::Builder;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
-    use hyper::http::request::Builder;
 
     #[test]
     fn test_runtime_http() {
-        let mock_server = tokio_test::block_on(MockServer::start());
-        tokio_test::block_on(
-            Mock::given(method("GET"))
-                .and(path("/"))
-                .respond_with(ResponseTemplate::new(200))
-                // Mounting the mock on the mock server - it's now effective!
-                .mount(&mock_server),
-        );
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.spawn(async move {
+            let mock_server = tokio_test::block_on(MockServer::start());
+            tokio_test::block_on(
+                Mock::given(method("GET"))
+                    .and(path("/"))
+                    .respond_with(ResponseTemplate::new(200))
+                    // Mounting the mock on the mock server - it's now effective!
+                    .mount(&mock_server),
+            );
 
-        let req = HttpRequest {
-            method: "get".into(),
-            url: &mock_server.uri(),
-            params: "test=a",
-            body: "{}",
-            headers: [ 
-                HttpHeaderParam { key: "bc", value: "1"}, 
-                HttpHeaderParam { key: "ac", value: "2"}, 
-                ].to_vec(),
-        };
+            let req = HttpRequest {
+                method: "get".into(),
+                url: &mock_server.uri(),
+                params: "test=a",
+                body: "{}",
+                headers: [
+                    HttpHeaderParam {
+                        key: "bc",
+                        value: "1",
+                    },
+                    HttpHeaderParam {
+                        key: "ac",
+                        value: "2",
+                    },
+                ]
+                .to_vec(),
+            };
 
-        let mut runtime = PluginRuntime {
-            config: PluginConfig {
-                name: "TestPlugin".to_string(),
-                allowed_env_vars: None,
-                allowed_domains: Some(vec!["127.0.0.1".to_string()]),
-            },
-        };
+            let mut runtime = PluginRuntime {
+                config: PluginConfig {
+                    name: "TestPlugin".to_string(),
+                    allowed_env_vars: None,
+                    allowed_domains: Some(vec!["127.0.0.1".to_string()]),
+                },
+            };
+            let response = match runtime.http(req) {
+                Ok(response) => response,
+                Err(e) => panic!("http request failed: {:?}", e),
+            };
 
-        let response = match runtime.http(req) {
-            Ok(response) => response,
-            Err(e) => panic!("http request failed: {:?}", e),
-        };
-
-        assert_eq!(200, response.status)
+            assert_eq!(200, response.status);
+        });
     }
 
     #[test]
@@ -357,8 +366,14 @@ mod tests {
     #[test]
     fn test_http_headers_from_runtime() {
         let mut headers = Vec::<HttpHeaderParam>::new();
-        headers.push(HttpHeaderParam { key: "content", value: "x" });
-        headers.push(HttpHeaderParam { key: "something", value: "y" });
+        headers.push(HttpHeaderParam {
+            key: "content",
+            value: "x",
+        });
+        headers.push(HttpHeaderParam {
+            key: "something",
+            value: "y",
+        });
 
         let mut header_map = HeaderMap::new();
         header_map.insert(
@@ -390,10 +405,19 @@ mod tests {
             "y".to_string().parse::<HeaderValue>().unwrap(),
         );
 
-        assert_eq!([ 
-            HttpHeaderResult { key: "content".to_string(), value: "x".to_string()}, 
-            HttpHeaderResult { key: "something".to_string(), value: "y".to_string()}
-            ].to_vec(), 
-            http_headers_to_runtime(header_map))
+        assert_eq!(
+            [
+                HttpHeaderResult {
+                    key: "content".to_string(),
+                    value: "x".to_string()
+                },
+                HttpHeaderResult {
+                    key: "something".to_string(),
+                    value: "y".to_string()
+                }
+            ]
+            .to_vec(),
+            http_headers_to_runtime(header_map)
+        )
     }
 }
