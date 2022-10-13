@@ -44,6 +44,8 @@ impl PartialEq for HttpHeaderResult {
     }
 }
 
+impl Eq for HttpHeaderResult {}
+
 impl fmt::Debug for WasmModule {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WasmModule").finish()
