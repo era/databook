@@ -148,7 +148,8 @@ impl runtime::Runtime for PluginRuntime {
                 message: e.to_string(),
             })?;
 
-        //TODO ASYNC / SYNC BRIDGE
+        //TODO WE should stop using this and
+        // use instead reqwest which is blocking
         let (tx, rx) = channel::bounded(1);
         let rt = tokio::runtime::Runtime::new().expect("Could not start a new Tokio runtime");
         let handle = rt.handle();
