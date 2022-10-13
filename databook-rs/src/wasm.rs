@@ -1,8 +1,4 @@
 use crate::plugin_config::PluginConfig;
-use crossbeam::channel;
-use hyper::client::HttpConnector;
-use hyper::header::{HeaderMap, HeaderName, HeaderValue};
-use hyper::{Body, Client, Request};
 use std::env;
 use std::fmt;
 use std::str;
@@ -20,7 +16,6 @@ use runtime::{
 };
 
 const HTTP_REQUEST_FAILED: u16 = 100;
-const HTTP_INVALID_BODY: u16 = 101;
 
 pub struct PluginRuntime {
     config: PluginConfig,
@@ -84,6 +79,7 @@ impl WasmModule {
 
         add_to_linker(&mut linker, |cx| &mut cx.runtime)
             .map_err(|e| WasmError::GenericError(e.to_string()))?;
+
         Ok(Self {
             module,
             linker,
@@ -134,30 +130,44 @@ impl runtime::Runtime for PluginRuntime {
             });
         }
 
-        let req = Request::builder()
-            .uri(build_http_url(request.url, request.params))
-            .method(request.method);
+        let client = reqwest::blocking::Client::new();
+        let uri = build_http_url(request.url, request.params);
 
-        let req_headers: Vec<HttpHeaderParam> = request.headers;
-        let req = http_headers_from_runtime(&req_headers, req);
+        let req = match request.method.to_uppercase().as_str() {
+            "GET" => client.get(uri),
+            "POST" => client.post(uri),
+            "PUT" => client.put(uri),
+            "DELETE" => client.delete(uri),
+            _ => {
+                return Err(Error {
+                    code: 0,
+                    message: "Invalid HTTP METHOD".into(),
+                })
+            }
+        };
 
-        let req = req
-            .body(Body::from(request.body.to_string()))
-            .map_err(|e| Error {
-                code: HTTP_INVALID_BODY,
-                message: e.to_string(),
-            })?;
+        let req = req.body(request.body.to_string());
 
-        //TODO WE should stop using this and
-        // use instead reqwest which is blocking
-        let (tx, rx) = channel::bounded(1);
-        let rt = tokio::runtime::Runtime::new().expect("Could not start a new Tokio runtime");
-        let handle = rt.handle();
-        handle.spawn(async move { tx.send(do_request(req).await) });
-        let response = rx.recv().unwrap();
+        let req = http_headers_from_runtime(&request.headers, req);
 
-        rt.shutdown_background();
-        response
+        let response = req.send().map_err(|e| Error {
+            code: HTTP_REQUEST_FAILED,
+            message: e.to_string(),
+        })?;
+
+        let headers = http_headers_to_runtime(&response.headers());
+
+        Ok(HttpResponse {
+            status: response.status().as_u16(),
+            response: response
+                .text()
+                .map_err(|e| Error {
+                    code: 0,
+                    message: format!("Could not parse http response as text {:?}", e),
+                })?
+                .to_string(),
+            headers,
+        })
     }
 
     fn env(&mut self, key: &str) -> Result<String, Error> {
@@ -206,61 +216,25 @@ impl PluginRuntime {
     }
 }
 
-pub async fn do_request(request: Request<hyper::Body>) -> Result<HttpResponse, Error> {
-    let client: Client<HttpConnector, hyper::Body> = Client::new();
-
-    tracing::info!("doing http request {:?}", request);
-
-    let response = client.request(request).await.map_err(|e| Error {
-        code: HTTP_REQUEST_FAILED,
-        message: e.to_string(),
-    })?;
-
-    tracing::info!("http response is {:?}", response);
-
-    let status = response.status().as_u16();
-    //TODO check status code
-    let headers = http_headers_to_runtime(response.headers().clone());
-
-    let response_body = hyper::body::to_bytes(response.into_body())
-        .await
-        .map_err(|e| Error {
-            code: HTTP_REQUEST_FAILED,
-            message: e.to_string(),
-        })?;
-
-    let response_body = String::from_utf8(response_body.into_iter().collect())
-        .expect("could not collect response body to convert to string");
-
-    Ok(HttpResponse {
-        status,
-        headers,
-        response: response_body,
-    })
-}
-
 fn build_http_url(uri: &str, params: &str) -> String {
     format!("{}?{}", uri, params)
 }
 
 fn http_headers_from_runtime(
     headers: &Vec<HttpHeaderParam>,
-    mut req: hyper::http::request::Builder,
-) -> hyper::http::request::Builder {
+    mut req: reqwest::blocking::RequestBuilder,
+) -> reqwest::blocking::RequestBuilder {
     for header in headers {
-        req = req.header(
-            header.key.parse::<HeaderName>().unwrap(),
-            header.value.to_string().parse::<HeaderValue>().unwrap(),
-        )
+        req = req.header(header.key, header.value)
     }
     req
 }
 
-fn http_headers_to_runtime(header_map: HeaderMap) -> Vec<HttpHeaderResult> {
+fn http_headers_to_runtime(header_map: &reqwest::header::HeaderMap) -> Vec<HttpHeaderResult> {
     let mut runtime_headers = Vec::<HttpHeaderResult>::new();
     for (key, value) in header_map {
         let runtime_header = HttpHeaderResult {
-            key: key.unwrap().as_str().into(),
+            key: key.as_str().into(),
             value: value.to_str().unwrap().into(),
         };
         runtime_headers.push(runtime_header);
@@ -271,7 +245,6 @@ fn http_headers_to_runtime(header_map: HeaderMap) -> Vec<HttpHeaderResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hyper::http::request::Builder;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -371,6 +344,7 @@ mod tests {
 
     #[test]
     fn test_http_headers_from_runtime() {
+        let client = reqwest::blocking::Client::new().post("https://google.com");
         let mut headers = Vec::<HttpHeaderParam>::new();
         headers.push(HttpHeaderParam {
             key: "content",
@@ -381,35 +355,24 @@ mod tests {
             value: "y",
         });
 
-        let mut header_map = HeaderMap::new();
-        header_map.insert(
-            "content".to_string().parse::<HeaderName>().unwrap(),
-            "x".to_string().parse::<HeaderValue>().unwrap(),
-        );
-        header_map.insert(
-            "something".to_string().parse::<HeaderName>().unwrap(),
-            "y".to_string().parse::<HeaderValue>().unwrap(),
-        );
+        let mut header_map = reqwest::header::HeaderMap::new();
+        header_map.insert("content", "x".parse().unwrap());
+        header_map.insert("something", "y".parse().unwrap());
 
         assert_eq!(
             &header_map,
-            http_headers_from_runtime(&headers, Builder::new())
-                .headers_ref()
+            http_headers_from_runtime(&headers, client)
+                .build()
                 .unwrap()
-        )
+                .headers()
+        );
     }
 
     #[test]
     fn test_http_headers_to_runtime() {
-        let mut header_map = HeaderMap::new();
-        header_map.insert(
-            "content".to_string().parse::<HeaderName>().unwrap(),
-            "x".to_string().parse::<HeaderValue>().unwrap(),
-        );
-        header_map.insert(
-            "something".to_string().parse::<HeaderName>().unwrap(),
-            "y".to_string().parse::<HeaderValue>().unwrap(),
-        );
+        let mut header_map = reqwest::header::HeaderMap::new();
+        header_map.insert("content", "x".parse().unwrap());
+        header_map.insert("something", "y".parse().unwrap());
 
         assert_eq!(
             [
@@ -423,7 +386,7 @@ mod tests {
                 }
             ]
             .to_vec(),
-            http_headers_to_runtime(header_map)
+            http_headers_to_runtime(&header_map)
         )
     }
 }

@@ -43,7 +43,7 @@ impl Databook for DatabookGrpc {
     #[instrument]
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         tracing::info!("received get request");
-        let response = match PLUGINS.get() {
+        let response = tokio::task::spawn_blocking(|| match PLUGINS.get() {
             Some(p) => p
                 .read()
                 .map_err(|e| {
@@ -56,10 +56,14 @@ impl Databook for DatabookGrpc {
                     Status::new(Code::Internal, "Internal Error")
                 }),
             None => Err(Status::new(Code::Internal, "No plugins setup")),
-        }?;
+        })
+        .await
+        .expect("could not join back the tokio task thread");
 
-        let reply = GetResponse { output: response };
-        Ok(Response::new(reply))
+        match response {
+            Ok(response) => Ok(Response::new(GetResponse { output: response })),
+            Err(e) => Err(e),
+        }
     }
 }
 
