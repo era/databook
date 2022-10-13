@@ -116,7 +116,7 @@ impl WasmModule {
     }
 }
 
-impl runtime::Runtime for PluginRuntime {
+impl Runtime for PluginRuntime {
     fn http(&mut self, request: HttpRequest) -> Result<HttpResponse, Error> {
         if !self.is_domain_allowed(request.url) {
             return Err(Error {
