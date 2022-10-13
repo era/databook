@@ -151,17 +151,14 @@ impl runtime::Runtime for PluginRuntime {
             message: e.to_string(),
         })?;
 
-        let headers = http_headers_to_runtime(&response.headers());
+        let headers = http_headers_to_runtime(response.headers());
 
         Ok(HttpResponse {
             status: response.status().as_u16(),
-            response: response
-                .text()
-                .map_err(|e| Error {
-                    code: 0,
-                    message: format!("Could not parse http response as text {:?}", e),
-                })?
-                .to_string(),
+            response: response.text().map_err(|e| Error {
+                code: 0,
+                message: format!("Could not parse http response as text {:?}", e),
+            })?,
             headers,
         })
     }
