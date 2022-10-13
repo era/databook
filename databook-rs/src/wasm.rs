@@ -21,10 +21,9 @@ pub struct PluginRuntime {
     config: PluginConfig,
 }
 
-struct Context<I, E> {
+struct Context {
     wasi: wasmtime_wasi::WasiCtx,
-    imports: I,
-    exports: E,
+    exports: PluginData,
     runtime: PluginRuntime,
 }
 
@@ -35,7 +34,7 @@ pub enum WasmError {
 
 pub struct WasmModule {
     module: Module,
-    linker: Linker<Context<PluginData, PluginData>>,
+    linker: Linker<Context>,
     engine: Engine,
 }
 
@@ -72,10 +71,8 @@ impl WasmModule {
 
         let mut linker = Linker::new(&engine);
 
-        wasmtime_wasi::add_to_linker(&mut linker, |cx: &mut Context<PluginData, PluginData>| {
-            &mut cx.wasi
-        })
-        .map_err(|e| WasmError::GenericError(e.to_string()))?;
+        wasmtime_wasi::add_to_linker(&mut linker, |cx: &mut Context| &mut cx.wasi)
+            .map_err(|e| WasmError::GenericError(e.to_string()))?;
 
         add_to_linker(&mut linker, |cx| &mut cx.runtime)
             .map_err(|e| WasmError::GenericError(e.to_string()))?;
@@ -87,12 +84,11 @@ impl WasmModule {
         })
     }
 
-    fn new_store(&self, config: PluginConfig) -> Store<Context<PluginData, PluginData>> {
+    fn new_store(&self, config: PluginConfig) -> Store<Context> {
         Store::new(
             &self.engine,
             Context {
                 wasi: default_wasi(),
-                imports: PluginData::default(),
                 exports: PluginData::default(),
                 runtime: PluginRuntime { config },
             },
