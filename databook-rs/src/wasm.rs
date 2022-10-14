@@ -329,6 +329,7 @@ mod tests {
 
         assert!(runtime.is_env_var_allowed("TEST"));
     }
+
     #[test]
     fn test_get_input() {
         let mut runtime = PluginRuntime {
