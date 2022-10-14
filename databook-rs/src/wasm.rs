@@ -329,6 +329,18 @@ mod tests {
 
         assert!(runtime.is_env_var_allowed("TEST"));
     }
+    #[test]
+    fn test_get_input() {
+        let mut runtime = PluginRuntime {
+            config: PluginConfig {
+                name: "TestPlugin".to_string(),
+                allowed_env_vars: Some(vec!["TEST".to_string()]),
+                allowed_domains: None,
+            },
+            input: HashMap::from([("my".to_string(), "test".to_string())]),
+        };
+        assert_eq!(Some("test".to_string()), runtime.get("my"));
+    }
 
     #[test]
     fn test_read_env_var() {
