@@ -25,3 +25,5 @@ record http-response {
 http: func(request: http-request) -> result<http-response, error>
 
 env: func(key: string) -> result<string, error>
+
+get: func(key: string) -> option<string>

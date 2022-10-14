@@ -1,4 +1,5 @@
 use crate::plugin_config::PluginConfig;
+use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::str;
@@ -19,6 +20,7 @@ const HTTP_REQUEST_FAILED: u16 = 100;
 
 pub struct PluginRuntime {
     config: PluginConfig,
+    input: HashMap<String, String>,
 }
 
 struct Context {
@@ -86,21 +88,25 @@ impl WasmModule {
         })
     }
 
-    fn new_store(&self, config: PluginConfig) -> Store<Context> {
+    fn new_store(&self, config: PluginConfig, input: HashMap<String, String>) -> Store<Context> {
         Store::new(
             &self.engine,
             Context {
                 wasi: default_wasi(),
                 exports: PluginData::default(),
-                runtime: PluginRuntime { config },
+                runtime: PluginRuntime { config, input },
             },
         )
     }
 
     // invokes the plugin and gets the output from it
     #[instrument]
-    pub fn invoke<'a>(&self, input: String, config: PluginConfig) -> Result<String, WasmError> {
-        let mut store = self.new_store(config);
+    pub fn invoke<'a>(
+        &self,
+        input: HashMap<String, String>,
+        config: PluginConfig,
+    ) -> Result<String, WasmError> {
+        let mut store = self.new_store(config, input);
         let (plugin, _instance) =
             Plugin::instantiate(&mut store, &self.module, &mut self.linker.clone(), |cx| {
                 &mut cx.exports
@@ -111,7 +117,7 @@ impl WasmModule {
             })?;
 
         plugin
-            .invoke(&mut store, &input)
+            .invoke(&mut store)
             .map_err(|e| WasmError::GenericError(e.to_string()))
     }
 }
@@ -180,6 +186,10 @@ impl Runtime for PluginRuntime {
                 ),
             })
         }
+    }
+
+    fn get(&mut self, key: &str) -> Option<String> {
+        self.input.get(key).cloned()
     }
 }
 
@@ -278,6 +288,7 @@ mod tests {
                 allowed_env_vars: None,
                 allowed_domains: Some(vec!["127.0.0.1".to_string()]),
             },
+            input: HashMap::new(),
         };
 
         let response = match runtime.http(req) {
@@ -296,6 +307,7 @@ mod tests {
                 allowed_env_vars: None,
                 allowed_domains: Some(vec!["google.com".to_string()]),
             },
+            input: HashMap::new(),
         };
 
         assert!(runtime.is_domain_allowed("https://google.com/something"));
@@ -310,6 +322,7 @@ mod tests {
                 allowed_env_vars: Some(vec!["TEST".to_string()]),
                 allowed_domains: None,
             },
+            input: HashMap::new(),
         };
 
         assert!(!runtime.is_env_var_allowed("TEST1"));
@@ -325,6 +338,7 @@ mod tests {
                 allowed_env_vars: Some(vec!["TEST".to_string()]),
                 allowed_domains: None,
             },
+            input: HashMap::new(),
         };
         env::set_var("TEST", "VAL");
 

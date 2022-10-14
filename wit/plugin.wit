@@ -1,1 +1,1 @@
-invoke: func(input: string) -> string
+invoke: func() -> string

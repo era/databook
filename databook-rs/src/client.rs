@@ -1,4 +1,4 @@
-use databook::databook_client::{DatabookClient};
+use databook::databook_client::DatabookClient;
 use databook::GetRequest;
 use std::collections::HashMap;
 

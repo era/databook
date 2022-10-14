@@ -43,19 +43,22 @@ impl Databook for DatabookGrpc {
     #[instrument]
     async fn get(&self, request: Request<GetRequest>) -> Result<Response<GetResponse>, Status> {
         tracing::info!("received get request");
-        let response = tokio::task::spawn_blocking(|| match PLUGINS.get() {
-            Some(p) => p
-                .read()
-                .map_err(|e| {
-                    tracing::error!("Could not get lock for plugins object {:?}", e);
-                    Status::new(Code::Internal, "Internal Error")
-                })?
-                .invoke(&request.into_inner().name, "sample_input".to_string())
-                .map_err(|e| {
-                    tracing::error!("error while calling wasm plugin {:?}", e);
-                    Status::new(Code::Internal, "Internal Error")
-                }),
-            None => Err(Status::new(Code::Internal, "No plugins setup")),
+        let response = tokio::task::spawn_blocking(|| {
+            let request = request.into_inner();
+            match PLUGINS.get() {
+                Some(p) => p
+                    .read()
+                    .map_err(|e| {
+                        tracing::error!("Could not get lock for plugins object {:?}", e);
+                        Status::new(Code::Internal, "Internal Error")
+                    })?
+                    .invoke(&request.name, request.options)
+                    .map_err(|e| {
+                        tracing::error!("error while calling wasm plugin {:?}", e);
+                        Status::new(Code::Internal, "Internal Error")
+                    }),
+                None => Err(Status::new(Code::Internal, "No plugins setup")),
+            }
         })
         .await
         .expect("could not join back the tokio task thread");
