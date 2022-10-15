@@ -10,6 +10,7 @@ use tracing::instrument;
 
 mod plugin_config;
 mod plugin_manager;
+mod plugin_runtime;
 mod wasm;
 
 pub mod databook {
