@@ -3,7 +3,10 @@ use std::collections::HashMap;
 use std::env;
 use url::{Host, Url};
 wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
-use runtime::{Error, HttpHeaderParam, HttpHeaderResult, HttpRequest, HttpResponse, Runtime};
+use runtime::{Error, 
+    HttpHeaderParam, HttpHeaderResult, HttpRequest, HttpResponse, 
+    LogLevel,
+    Runtime};
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 
@@ -87,6 +90,16 @@ impl Runtime for PluginRuntime {
 
     fn get(&mut self, key: &str) -> Option<String> {
         self.input.get(key).cloned()
+    }
+
+    fn log(&mut self, message: &str, level: LogLevel) {
+        match level {
+            LogLevel::Error => tracing::error!("{}", message),
+            LogLevel::Debug => tracing::debug!("{}", message),
+            LogLevel::Info => tracing::info!("{}", message),
+            LogLevel::Warn => tracing::warn!("{}", message),
+            LogLevel::Trace => tracing::trace!("{}", message)
+        }
     }
 }
 
@@ -307,5 +320,48 @@ mod tests {
             .to_vec(),
             http_headers_to_runtime(&header_map)
         )
+    }
+
+    #[test]
+    fn test_log_levels() {
+        use logtest::Logger;
+        use log::Level;
+
+        let mut logger = Logger::start();
+        
+        let mut runtime = PluginRuntime {
+            config: PluginConfig {
+                name: "TestPlugin".to_string(),
+                allowed_env_vars: Some(vec!["TEST".to_string()]),
+                allowed_domains: None,
+            },
+            input: HashMap::new(),
+        };
+
+        runtime.log("InfoMessage", LogLevel::Info);
+        runtime.log("WarnMessage", LogLevel::Warn);
+        runtime.log("TraceMessage", LogLevel::Trace);
+        runtime.log("ErrorMessage", LogLevel::Error);
+        runtime.log("DebugMessage", LogLevel::Debug);
+
+        let mut message = logger.pop().unwrap();
+        assert_eq!(message.level(), Level::Info);
+        assert_eq!(message.args(), "InfoMessage");
+
+        message = logger.pop().unwrap();
+        assert_eq!(message.level(), Level::Warn);
+        assert_eq!(message.args(), "WarnMessage");
+
+        message = logger.pop().unwrap();
+        assert_eq!(message.level(), Level::Trace);
+        assert_eq!(message.args(), "TraceMessage");
+
+        message = logger.pop().unwrap();
+        assert_eq!(message.level(), Level::Error);
+        assert_eq!(message.args(), "ErrorMessage");
+
+        message = logger.pop().unwrap();
+        assert_eq!(message.level(), Level::Debug);
+        assert_eq!(message.args(), "DebugMessage");
     }
 }
