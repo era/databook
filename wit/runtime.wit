@@ -3,6 +3,14 @@ record error {
     message: string,
 }
 
+enum log-level {
+    error,
+    trace,
+    debug,
+    info,
+    warn
+}
+
 record http-header {
     key: string,
     value: string
@@ -27,3 +35,5 @@ http: func(request: http-request) -> result<http-response, error>
 env: func(key: string) -> result<string, error>
 
 get: func(key: string) -> option<string>
+
+log: func(level: log-level, message: string)

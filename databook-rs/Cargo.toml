@@ -38,3 +38,4 @@ tonic-build = "0.7"
 [dev-dependencies]
 tokio-test = "0.4.2"
 wiremock = "0.5.14"
+logtest = "2.0.0"
