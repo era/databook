@@ -16,9 +16,9 @@ impl plugin::Plugin for Plugin {
                 value: "databook",
             }],
         };
-        runtime::log("Starting request", runtime::LogLevel::Info);
+        runtime::log(runtime::LogLevel::Info, "Starting request");
         runtime::http(req);
-        runtime::log("Finished request", runtime::LogLevel::Info);
+        runtime::log(runtime::LogLevel::Info, "Finished request");
         hello.push_str("World");
         hello
     }

@@ -36,4 +36,4 @@ env: func(key: string) -> result<string, error>
 
 get: func(key: string) -> option<string>
 
-log: func(message: string, level: log-level)
+log: func(level: log-level, message: string)

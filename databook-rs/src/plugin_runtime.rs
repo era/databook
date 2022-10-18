@@ -92,7 +92,7 @@ impl Runtime for PluginRuntime {
         self.input.get(key).cloned()
     }
 
-    fn log(&mut self, message: &str, level: LogLevel) {
+    fn log(&mut self,  level: LogLevel, message: &str) {
         match level {
             LogLevel::Error => tracing::error!("{}", message),
             LogLevel::Debug => tracing::debug!("{}", message),
@@ -337,31 +337,21 @@ mod tests {
             },
             input: HashMap::new(),
         };
+        let my_message = "my";
 
-        runtime.log("InfoMessage", LogLevel::Info);
-        runtime.log("WarnMessage", LogLevel::Warn);
-        runtime.log("TraceMessage", LogLevel::Trace);
-        runtime.log("ErrorMessage", LogLevel::Error);
-        runtime.log("DebugMessage", LogLevel::Debug);
+        let levels = HashMap::from([
+            (Level::Info, LogLevel::Info),
+            (Level::Debug, LogLevel::Debug),
+            (Level::Trace, LogLevel::Trace),
+            (Level::Error, LogLevel::Error),
+            (Level::Warn, LogLevel::Warn),
+            ]);
 
-        let mut message = logger.pop().unwrap();
-        assert_eq!(message.level(), Level::Info);
-        assert_eq!(message.args(), "InfoMessage");
-
-        message = logger.pop().unwrap();
-        assert_eq!(message.level(), Level::Warn);
-        assert_eq!(message.args(), "WarnMessage");
-
-        message = logger.pop().unwrap();
-        assert_eq!(message.level(), Level::Trace);
-        assert_eq!(message.args(), "TraceMessage");
-
-        message = logger.pop().unwrap();
-        assert_eq!(message.level(), Level::Error);
-        assert_eq!(message.args(), "ErrorMessage");
-
-        message = logger.pop().unwrap();
-        assert_eq!(message.level(), Level::Debug);
-        assert_eq!(message.args(), "DebugMessage");
+        for (level, runtime_level) in levels {
+            runtime.log(runtime_level, my_message);
+            let message = logger.pop().unwrap();
+            assert_eq!(message.level(), level);
+            assert_eq!(my_message, message.args());
+        }
     }
 }
