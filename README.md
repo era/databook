@@ -14,7 +14,7 @@ my_metric[5m]
 
 This would be send to the backend, the plugin would query prometheus and return the result to the front-end. The front-end would parse the result and plot it.
 
-The cool thing is that all plugins are run as WASM module, so they are isolated from the host. It's almost like databook-rs was in reality a FaaS and the plugins the functions. If you want, you can actually use databook-rs as a (limited) FaaS, instead of having the front-end calling it, you can have your own apps using it as backend, you just need to generate the client code from the protobufs. 
+The cool thing is that all plugins are run as WASM module, so they are isolated from the host. It's almost like databook-rs was in reality a FaaS and the plugins the functions. If you want, you can actually use databook-rs as a (limited) FaaS, instead of having the front-end calling it, you can have your own apps using it as backend, you just need to generate the client code from the protobufs. The protobufs are docummented and are at the `proto` folder.
 
 ## Status
 
