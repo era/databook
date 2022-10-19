@@ -3,14 +3,21 @@ syntax = "proto3";
 package databook;
 
 service Databook {
+  // Invokes a plugin and returns its output
   rpc get(GetRequest) returns (GetResponse) {}
 }
 
 message GetRequest {
+    // The name of the plugin to be invoked
     string name = 1;
+    // Any options that will be used inside the plugin
+    // you can think of it as the input of the plugin
+    // or ARGS of a script
     map<string, string> options = 2;
 }
 
 message GetResponse {
+    // the output from the plugin
     string output = 1;
+    //TODO error messages
   }
