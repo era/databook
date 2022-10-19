@@ -2,7 +2,13 @@
 
 ## What?
 
-The idea is to create a notebook system, where users can write WASM plugins in order to enrich their experience.
+The idea is to create a SRE notebook system (something similar as Jupyter but focused on oncall), where users can write WASM plugins in order to enrich their experience.
+
+Imagine that you are oncall for AWS, you receive a page in the middle of the night, a bit incident is happening. If you use something as Jira to update the company about the steps you are taking to solve the issue, they have to wait you run several commands, check several things, and than update the Jira. This is not great, there is very few paper trail. If someone is helping you, if you miss to sync exactly what each one is doing, you are doomed to repeat the same steps. Worst than that, in the future, if a similar situation happens again, it's most like that people won't be able to learn from the few information you added to the Jira.
+
+Now imagine that instead of using a bunch of different software and attaching logs and screenshots to the Jira you could just open a web page, type some commands, see the output and record it forever. Also, everybody interested in the incident could just follow up what you are doing by opening the same page.
+
+That is the idea of this software. Given that users can write different plugins, it does not matter what is the monitoring stack of your company, they all can use it. Also, you could add a few commands to: reboot machines, restart services and so on.
 
 For example if I want to let users query prometheus while using the notebook, I would install the prometheus plugin on the databook-rs. And in the front-end I would write something like:
 
