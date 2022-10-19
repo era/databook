@@ -50,6 +50,19 @@ Databook-rs exposes a grpc service. That grpc server is super simple and only co
 
 If you want to test out the databook-rs without any front-end, you can start it with a simple: `cargo run --bin server` and you can send a super simple request using: `cargo run --bin client`.
 
+
+```mermaid
+graph TD
+    A[Frontend] -->|request.name = prometheus, request.options.query = my_metric| B[Grpc server]
+    B --> C{Wasm plugin selector}
+    C --> WASM[Selects right plugin to instantiate and run using wasm]
+    WASM -->|Prometheus| D[Query Prometheus Server]
+    WASM -->|Cloud Watch| E[Query Cloud Watch]
+    D --> |response.output| --> F[Frontend]
+    E -->  |response.output| --> F[Frontend]
+```
+
+
 ### web
 
 (**designed by [Marcelo J](https://codeberg.org/marceloadsj1)**)
