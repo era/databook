@@ -58,8 +58,8 @@ graph TD
     C --> WASM[Selects right plugin to instantiate and run using wasm]
     WASM -->|Prometheus| D[Query Prometheus Server]
     WASM -->|Cloud Watch| E[Query Cloud Watch]
-    D --> |response.output| --> F[Frontend]
-    E -->  |response.output| --> F[Frontend]
+    D --> |response.output | F[Frontend]
+    E -->  |response.output| F[Frontend]
 ```
 
 
