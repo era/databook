@@ -9,7 +9,7 @@ For example if I want to let users query prometheus while using the notebook, I 
 
 ```
 @plugin=prometheus
-my_metryc[5m]
+my_metric[5m]
 ```
 
 This would be send to the backend, the plugin would query prometheus and return the result to the front-end. The front-end would parse the result and plot it.
