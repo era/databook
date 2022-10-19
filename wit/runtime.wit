@@ -17,8 +17,11 @@ record http-header {
 }
 
 record http-request {
+    // http method (e.g. POST, GET)
     method: string,
+    // full path of the url (should include protocol, e.g. https)
     url: string,
+    // query strings
     params: string,
     body: string,
     headers: list<http-header>
@@ -30,10 +33,18 @@ record http-response {
     response: string,
 }
 
+// executes an http request
+// the URI must be in the plugin configuration
+// otherwise the runtime will block it to happen
 http: func(request: http-request) -> result<http-response, error>
 
+// gets a variable env as long as it's on the allowed list 
+// of the plugin configuration
 env: func(key: string) -> result<string, error>
 
+// when someone sends a request to databook grpc server they set an options hashmap.
+// this method exposes those values.
 get: func(key: string) -> option<string>
 
+// logs messages using log-level
 log: func(level: log-level, message: string)
