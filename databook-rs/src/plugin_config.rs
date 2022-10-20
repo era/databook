@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use std::fs;
 
-
 #[derive(Debug, Deserialize, PartialEq, Eq, Clone)]
 pub struct PluginConfig {
     pub name: String,

@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use std::env;
 use url::{Host, Url};
 wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
-use runtime::{Error, 
-    HttpHeaderParam, HttpHeaderResult, HttpRequest, HttpResponse, 
-    LogLevel,
-    Runtime};
+use runtime::{
+    Error, HttpHeaderParam, HttpHeaderResult, HttpRequest, HttpResponse, LogLevel, Runtime,
+};
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 
@@ -92,13 +91,13 @@ impl Runtime for PluginRuntime {
         self.input.get(key).cloned()
     }
 
-    fn log(&mut self,  level: LogLevel, message: &str) {
+    fn log(&mut self, level: LogLevel, message: &str) {
         match level {
             LogLevel::Error => tracing::error!("{}", message),
             LogLevel::Debug => tracing::debug!("{}", message),
             LogLevel::Info => tracing::info!("{}", message),
             LogLevel::Warn => tracing::warn!("{}", message),
-            LogLevel::Trace => tracing::trace!("{}", message)
+            LogLevel::Trace => tracing::trace!("{}", message),
         }
     }
 }
@@ -324,11 +323,11 @@ mod tests {
 
     #[test]
     fn test_log_levels() {
-        use logtest::Logger;
         use log::Level;
+        use logtest::Logger;
 
         let mut logger = Logger::start();
-        
+
         let mut runtime = PluginRuntime {
             config: PluginConfig {
                 name: "TestPlugin".to_string(),
@@ -345,7 +344,7 @@ mod tests {
             (Level::Trace, LogLevel::Trace),
             (Level::Error, LogLevel::Error),
             (Level::Warn, LogLevel::Warn),
-            ]);
+        ]);
 
         for (level, runtime_level) in levels {
             runtime.log(runtime_level, my_message);
