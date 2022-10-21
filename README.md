@@ -1,10 +1,13 @@
 # Databook - Notebook with wasm plugins
 
+
 ## What?
 
-The idea is to create a SRE notebook system (something similar as Jupyter but focused on oncall), where users can write WASM plugins in order to enrich their experience.
+## Persistent Debugging Sessions
 
-Imagine that you are oncall for AWS, you receive a page in the middle of the night, a bit incident is happening. If you use something as Jira to update the company about the steps you are taking to solve the issue, they have to wait you run several commands, check several things, and than update the Jira. This is not great, there is very few paper trail. If someone is helping you, if you miss to sync exactly what each one is doing, you are doomed to repeat the same steps. Worst than that, in the future, if a similar situation happens again, it's most like that people won't be able to learn from the few information you added to the Jira.
+Databook can be use as a SRE notebook system (something similar as Jupyter but focused on oncall), where users can write WASM plugins in order to enrich their experience.
+
+Imagine that you are oncall, you receive a page in the middle of the night, a bit incident is happening. If you use something as Jira to update the company about the steps you are taking to solve the issue, they have to wait you run several commands, check several things, and than update the Jira. This is not great, there is very few paper trail. If someone is helping you, if you miss to sync exactly what each one is doing, you are doomed to repeat the same steps. Worst than that, in the future, if a similar situation happens again, it's most like that people won't be able to learn from the few information you added to the Jira.
 
 Now imagine that instead of using a bunch of different software and attaching logs and screenshots to the Jira you could just open a web page, type some commands, see the output and record it forever. Also, everybody interested in the incident could just follow up what you are doing by opening the same page.
 
@@ -20,7 +23,12 @@ my_metric[5m]
 
 This would be send to the backend, the plugin would query prometheus and return the result to the front-end. The front-end would parse the result and plot it.
 
-The cool thing is that all plugins are run as WASM module, so they are isolated from the host. It's almost like databook-rs was in reality a FaaS and the plugins the functions. If you want, you can actually use databook-rs as a (limited) FaaS, instead of having the front-end calling it, you can have your own apps using it as backend, you just need to generate the client code from the protobufs. The protobufs are docummented and are at the `proto` folder.
+The cool thing is that all plugins are run as WASM module, so they are isolated from the host.
+
+## Pluggable front-end
+
+If you want, you can use the databook-rs with any front-end, you can have your own apps using it as backend, you just need to generate the client code from the protobufs. The protobufs are docummented and are at the `proto` folder.
+
 
 ## Status
 
