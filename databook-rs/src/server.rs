@@ -8,10 +8,13 @@ use tonic::transport::Server;
 use tonic::{Code, Request, Response, Status};
 use tracing::instrument;
 
+#[macro_use] extern crate rocket;
+
 mod plugin_config;
 mod plugin_manager;
 mod plugin_runtime;
 mod wasm;
+mod rest;
 
 pub mod databook {
     tonic::include_proto!("databook");
@@ -76,6 +79,10 @@ impl Default for DatabookGrpc {
         Self::new()
     }
 }
+
+
+//TODO create rocket service
+
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
