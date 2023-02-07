@@ -1,3 +1,4 @@
+#![feature(proc_macro_hygiene, decl_macro)]
 use clap::Parser;
 use databook::databook_server::{Databook, DatabookServer};
 use databook::{GetRequest, GetResponse};
@@ -8,13 +9,17 @@ use tonic::transport::Server;
 use tonic::{Code, Request, Response, Status};
 use tracing::instrument;
 
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
+use rocket::request::Form;
+use rocket_contrib::json::Json;
+use tokio::spawn;
 
 mod plugin_config;
 mod plugin_manager;
 mod plugin_runtime;
-mod wasm;
 mod rest;
+mod wasm;
 
 pub mod databook {
     tonic::include_proto!("databook");
@@ -80,12 +85,38 @@ impl Default for DatabookGrpc {
     }
 }
 
+#[instrument]
+#[post("/invoke", data = "<request>")]
+fn rest_invoke(request: Json<rest::InvokePluginRequest>) -> Json<rest::InvokePluginResponse> {
+    tracing::info!("received get request");
+    let response = {
+        let request = request.into_inner();
+        match PLUGINS.get() {
+            Some(p) => p
+                .read()
+                .unwrap() //TODO
+                .invoke(&request.name, request.options)
+                .map_err(|e| {
+                    tracing::error!("error while calling wasm plugin {:?}", e);
+                    format!("error while invoking plugin {:?}", e)
+                }),
+            None => Err("No plugins setup".to_string()),
+        }
+    };
 
-//TODO create rocket service
+    match response {
+        Ok(response) => Json(rest::InvokePluginResponse {
+            output: Some(response),
+            error: None,
+        }),
+        Err(e) => Json(rest::InvokePluginResponse {
+            output: None,
+            error: Some(e.to_string()),
+        }),
+    }
+}
 
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     // Setups tracing
     let subscriber = tracing_subscriber::FmtSubscriber::new();
@@ -99,12 +130,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     PLUGINS
         .set(RwLock::new(plugin_manager))
         .expect("should always add plugin manager to once_cell");
-    // Setups GRPC server
-    let addr = args.address_to_listen.parse()?;
-    let grpc = DatabookGrpc::new();
-    Server::builder()
-        .add_service(DatabookServer::new(grpc))
-        .serve(addr)
-        .await?;
+
+    let rt = tokio::runtime::Runtime::new().unwrap();
+
+    let rest_join = rt.spawn(async {
+        rocket::ignite().mount("/", routes![rest_invoke]).launch();
+    });
+
+    let grpc_join = rt.spawn(async move {
+        // Setups GRPC server
+        let addr = args.address_to_listen.parse().unwrap();
+        let grpc = DatabookGrpc::new();
+        Server::builder()
+            .add_service(DatabookServer::new(grpc))
+            .serve(addr)
+            .await
+            .unwrap();
+    });
+
+    //TODO should block on both the rest and the grpc together
+    // if any finish, we should stop the service
+    // because something went wrong
+    rt.block_on(rest_join).unwrap();
+    rt.block_on(grpc_join).unwrap();
     Ok(())
 }

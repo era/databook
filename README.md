@@ -89,6 +89,10 @@ APIs directly.
 <TODO: Improve explanation>
 
 
+### web (folder)
+
+Web is a UI for Databook-rs made by [Marcelo Jr](https://codeberg.org/marceloadsj1).
+
 # Influenced by
 
 - Fiberplane
