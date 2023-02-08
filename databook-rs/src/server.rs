@@ -56,7 +56,7 @@ impl Databook for DatabookGrpc {
             let request = request.into_inner();
             match PLUGINS.get() {
                 Some(p) => p
-                    .read()
+                    .write() //TODO
                     .map_err(|e| {
                         tracing::error!("Could not get lock for plugins object {:?}", e);
                         Status::new(Code::Internal, "Internal Error")
@@ -93,7 +93,7 @@ fn rest_invoke(request: Json<rest::InvokePluginRequest>) -> Json<rest::InvokePlu
         let request = request.into_inner();
         match PLUGINS.get() {
             Some(p) => p
-                .read()
+                .write() //TODO
                 .unwrap() //TODO
                 .invoke(&request.name, request.options)
                 .map_err(|e| {

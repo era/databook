@@ -3,5 +3,3 @@
 You need to install wit-bindgen:
 
 cargo install --git https://github.com/bytecodealliance/wit-bindgen wit-bindgen-cli
-
-Check the wit file inside databook-rs folder!!

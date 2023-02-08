@@ -1,41 +1,45 @@
 use crate::plugin_config::PluginConfig;
 use std::collections::HashMap;
-use std::env;
+use std::{env, fmt};
 use url::{Host, Url};
+use wasmtime::{Engine, Module, Store, Config};
+use wasmtime::component::Linker;
+use wasmtime::component::Component;
+use tracing::instrument;
 //wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
-wasmtime::component::bindgen!("../wit/databook.wit");
-use runtime::{
-    Error, HttpHeaderParam, HttpHeaderResult, HttpRequest, HttpResponse, LogLevel, Runtime,
+wasmtime::component::bindgen!({world: "databook"});
+use host::{
+    Error, HttpHeader, HttpRequest, HttpResponse, LogLevel
 };
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 
-impl PartialEq for HttpHeaderResult {
+impl PartialEq for HttpHeader {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.value == other.value
     }
 }
-impl Eq for HttpHeaderResult {}
+impl Eq for HttpHeader {}
 
 pub struct PluginRuntime {
     pub config: PluginConfig,
     pub input: HashMap<String, String>,
 }
 
-impl Runtime for PluginRuntime {
-    fn http(&mut self, request: HttpRequest) -> Result<HttpResponse, Error> {
-        if !self.is_domain_allowed(request.url) {
-            return Err(Error {
+impl host::Host for PluginRuntime {
+    fn http(&mut self, request: HttpRequest) -> Result<Result<HttpResponse, Error>, anyhow::Error> {
+        if !self.is_domain_allowed(&request.url) {
+            return Ok(Err(Error {
                 code: 0,
                 message: format!(
                     "URL {:?} is not allowed, please add it to the allowed_domains",
                     request.url
                 ),
-            });
+            }));
         }
 
         let client = reqwest::blocking::Client::new();
-        let uri = build_http_url(request.url, request.params);
+        let uri = build_http_url(&request.url, &request.params);
 
         let req = match request.method.to_uppercase().as_str() {
             "GET" => client.get(uri),
@@ -43,10 +47,10 @@ impl Runtime for PluginRuntime {
             "PUT" => client.put(uri),
             "DELETE" => client.delete(uri),
             _ => {
-                return Err(Error {
+                return Ok(Err(Error {
                     code: 0,
                     message: "Invalid HTTP METHOD".into(),
-                })
+                }))
             }
         };
 
@@ -57,49 +61,51 @@ impl Runtime for PluginRuntime {
         let response = req.send().map_err(|e| Error {
             code: HTTP_REQUEST_FAILED,
             message: e.to_string(),
-        })?;
+        }).unwrap(); //TODO
 
         let headers = http_headers_to_runtime(response.headers());
 
-        Ok(HttpResponse {
+        Ok(Ok(HttpResponse {
             status: response.status().as_u16(),
             response: response.text().map_err(|e| Error {
                 code: 0,
                 message: format!("Could not parse http response as text {:?}", e),
             })?,
             headers,
-        })
+        }))
     }
 
-    fn env(&mut self, key: &str) -> Result<String, Error> {
+    fn env(&mut self, key: String) -> Result<Result<String, Error>, anyhow::Error> {
+        let key = &key;
         if self.is_env_var_allowed(key) {
-            env::var(key).map_err(|e| Error {
+            Ok(env::var(key).map_err(|e| Error {
                 code: 0,
                 message: e.to_string(),
-            })
+            }))
         } else {
-            Err(Error {
+            Ok(Err(Error {
                 code: 0,
                 message: format!(
                     "Key {:?} is not readable for plugin {:?}",
                     key, self.config.name
                 ),
-            })
+            }))
         }
     }
 
-    fn get(&mut self, key: &str) -> Option<String> {
-        self.input.get(key).cloned()
+    fn get(&mut self, key: String) -> Result<Option<String>, anyhow::Error> {
+        Ok(self.input.get(&key).cloned()) //TODO
     }
 
-    fn log(&mut self, level: LogLevel, message: &str) {
+    fn log(&mut self, level: LogLevel, message: String) -> std::result::Result<(), anyhow::Error> {
         match level {
             LogLevel::Error => tracing::error!("{}", message),
             LogLevel::Debug => tracing::debug!("{}", message),
             LogLevel::Info => tracing::info!("{}", message),
             LogLevel::Warn => tracing::warn!("{}", message),
             LogLevel::Trace => tracing::trace!("{}", message),
-        }
+        };
+        Ok(())
     }
 }
 
@@ -136,19 +142,19 @@ fn build_http_url(uri: &str, params: &str) -> String {
 }
 
 fn http_headers_from_runtime(
-    headers: &Vec<HttpHeaderParam>,
+    headers: &Vec<HttpHeader>,
     mut req: reqwest::blocking::RequestBuilder,
 ) -> reqwest::blocking::RequestBuilder {
     for header in headers {
-        req = req.header(header.key, header.value)
+        req = req.header(header.key.clone(), header.value.clone())
     }
     req
 }
 
-fn http_headers_to_runtime(header_map: &reqwest::header::HeaderMap) -> Vec<HttpHeaderResult> {
-    let mut runtime_headers = Vec::<HttpHeaderResult>::new();
+fn http_headers_to_runtime(header_map: &reqwest::header::HeaderMap) -> Vec<HttpHeader> {
+    let mut runtime_headers = Vec::<HttpHeader>::new();
     for (key, value) in header_map {
-        let runtime_header = HttpHeaderResult {
+        let runtime_header = HttpHeader {
             key: key.as_str().into(),
             value: value.to_str().unwrap().into(),
         };
@@ -157,9 +163,95 @@ fn http_headers_to_runtime(header_map: &reqwest::header::HeaderMap) -> Vec<HttpH
     runtime_headers
 }
 
+
+
+// old wasm.rs
+
+struct Context {
+    //wasi: wasmtime_wasi::WasiCtx,
+    //exports: PluginData,
+    runtime: PluginRuntime,
+}
+
+#[derive(Debug)]
+pub enum WasmError {
+    GenericError(String),
+}
+
+pub struct WasmModule {
+    module: Component,
+    linker: Linker<Context>,
+    engine: Engine,
+}
+
+impl fmt::Debug for WasmModule {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("WasmModule").finish()
+    }
+}
+
+impl WasmModule {
+    pub fn new(path: &str) -> Result<Self, WasmError> {
+        // An engine stores and configures global compilation settings like
+        // optimization level, enabled wasm features, etc.
+        let mut config = Config::new();
+        config.wasm_component_model(true);
+        let engine = Engine::new(&config).unwrap();//TODO
+
+
+        // We start off by creating a `Module` which represents a compiled form
+        // of our input wasm module. In this case it'll be JIT-compiled after
+        // we parse the text format.
+        //could use from_binary as well
+        let module = Component::from_file(&engine, path)
+            .map_err(|e| WasmError::GenericError(format!("{} {}",e.to_string(), path)))?;
+
+        let mut linker = Linker::new(&engine);
+        PluginSystem::add_to_linker(&mut linker, |cx: &mut Context| &mut cx.runtime)
+            .map_err(|e| WasmError::GenericError(e.to_string()))?;
+
+        Ok(Self {
+            module,
+            linker,
+            engine,
+        })
+    }
+
+    fn new_store(&self, config: PluginConfig, input: HashMap<String, String>) -> Store<Context> {
+        Store::new(
+            &self.engine,
+            Context {
+                // wasi: default_wasi(),
+                //exports: PluginData::default(),
+                runtime: PluginRuntime { config, input },
+            },
+        )
+    }
+
+    // invokes the plugin and gets the output from it
+    #[instrument]
+    pub fn invoke<'a>(
+        &mut self,
+        input: HashMap<String, String>,
+        config: PluginConfig,
+    ) -> Result<String, WasmError> {
+        let mut store = self.new_store(config, input);
+        let (plugin, _instance) =
+            PluginSystem::instantiate(&mut store, &self.module, &mut self.linker)
+                .map_err(|e| {
+                    tracing::error!("error while instantiating plugin {:?}", e);
+                    WasmError::GenericError(e.to_string())
+                })?;
+
+        plugin.call_invoke(&mut store)
+            .map_err(|e| WasmError::GenericError(e.to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::host::Host;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -176,17 +268,17 @@ mod tests {
 
         let req = HttpRequest {
             method: "get".into(),
-            url: &mock_server.uri(),
-            params: "test=a",
-            body: "{}",
+            url: mock_server.uri(),
+            params: "test=a".to_string(),
+            body: "{}".to_string(),
             headers: [
-                HttpHeaderParam {
-                    key: "bc",
-                    value: "1",
+                HttpHeader {
+                    key: "bc".to_string(),
+                    value: "1".to_string(),
                 },
-                HttpHeaderParam {
-                    key: "ac",
-                    value: "2",
+                HttpHeader {
+                    key: "ac".to_string(),
+                    value: "2".to_string(),
                 },
             ]
             .to_vec(),
@@ -201,7 +293,7 @@ mod tests {
             input: HashMap::new(),
         };
 
-        let response = match runtime.http(req) {
+        let response = match runtime.http(req).unwrap() {
             Ok(response) => response,
             Err(e) => panic!("http request failed: {:?}", e),
         };
@@ -250,7 +342,7 @@ mod tests {
             },
             input: HashMap::from([("my".to_string(), "test".to_string())]),
         };
-        assert_eq!(Some("test".to_string()), runtime.get("my"));
+        assert_eq!(Some("test".to_string()), runtime.get("my".to_string()).unwrap());
     }
 
     #[test]
@@ -263,9 +355,9 @@ mod tests {
             },
             input: HashMap::new(),
         };
-        env::set_var("TEST", "VAL");
+        env::set_var("TEST".to_string(), "VAL".to_string());
 
-        assert_eq!("VAL".to_string(), runtime.env("TEST").unwrap());
+        assert_eq!("VAL".to_string(), runtime.env("TEST".to_string()).unwrap().unwrap());
     }
 
     #[test]
@@ -277,14 +369,14 @@ mod tests {
     #[test]
     fn test_http_headers_from_runtime() {
         let client = reqwest::blocking::Client::new().post("https://google.com");
-        let mut headers = Vec::<HttpHeaderParam>::new();
-        headers.push(HttpHeaderParam {
-            key: "content",
-            value: "x",
+        let mut headers = Vec::<HttpHeader>::new();
+        headers.push(HttpHeader {
+            key: "content".to_string(),
+            value: "x".to_string(),
         });
-        headers.push(HttpHeaderParam {
-            key: "something",
-            value: "y",
+        headers.push(HttpHeader {
+            key: "something".to_string(),
+            value: "y".to_string(),
         });
 
         let mut header_map = reqwest::header::HeaderMap::new();
@@ -308,11 +400,11 @@ mod tests {
 
         assert_eq!(
             [
-                HttpHeaderResult {
+                HttpHeader {
                     key: "content".to_string(),
                     value: "x".to_string()
                 },
-                HttpHeaderResult {
+                HttpHeader {
                     key: "something".to_string(),
                     value: "y".to_string()
                 }
@@ -348,7 +440,7 @@ mod tests {
         ]);
 
         for (level, runtime_level) in levels {
-            runtime.log(runtime_level, my_message);
+            runtime.log(runtime_level, my_message.to_string());
             let message = logger.pop().unwrap();
             assert_eq!(message.level(), level);
             assert_eq!(my_message, message.args());

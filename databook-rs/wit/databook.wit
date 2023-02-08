@@ -1,0 +1,67 @@
+interface host {
+  
+  record error {
+      code: u16,
+      message: string,
+  }
+
+  enum log-level {
+      error,
+      trace,
+      debug,
+      info,
+      warn
+  }
+
+  record http-header {
+      key: string,
+      value: string
+  }
+
+  record http-request {
+      // http method (e.g. POST, GET)
+      method: string,
+      // full path of the url (should include protocol, e.g. https)
+      url: string,
+      // query strings
+      params: string,
+      body: string,
+      headers: list<http-header>
+  }
+
+  record http-response {
+      status: u16,
+      headers: list<http-header>,
+      response: string,
+  }
+
+    // executes an http request
+    // the URI must be in the plugin configuration
+    // otherwise the runtime will block it to happen
+    http: func(request: http-request) -> result<http-response, error>
+
+    // gets a variable env as long as it's on the allowed list
+    // of the plugin configuration
+    env: func(key: string) -> result<string, error>
+
+    // when someone sends a request to databook grpc server they set an options hashmap.
+    // this method exposes those values.
+    get: func(key: string) -> option<string>
+
+    // logs messages using log-level
+    log: func(level: log-level, message: string)
+}
+
+default world plugin-system {
+
+   import host: self.host
+
+  // This is the start of your program, consider it as the main function of a Rust program
+  // after the your wasm module is loaded, our runtime will invoke this.
+  // the string you return, will be send to the grpc caller.
+  // So whatever you want to return to the final user should be on that string.
+  // You could for example send a json, xml, and any other text-format file here
+  // as long as the caller is expecting you to do it.
+  // The caller as in: whoever send a reques to databook-rs grpc server
+  export invoke: func() -> string
+}

@@ -1,5 +1,5 @@
 use crate::plugin_config::PluginConfig;
-use crate::wasm::WasmModule;
+use crate::plugin_runtime::WasmModule;
 
 use std::collections::HashMap;
 use std::fs;
@@ -43,7 +43,10 @@ impl Plugin {
         // loads the wasm module from the wasm_path
         let wasm = match WasmModule::new(wasm_path.to_str().unwrap()) {
             Ok(wasm) => wasm,
-            Err(_) => return None,
+            Err(e) => {
+                tracing::error!("error while trying to install plugin {:?}", e);
+                return None
+            },
         };
 
         match config {
@@ -57,7 +60,7 @@ impl Plugin {
 
     // instantiate the wasm module and calls (exported) invoke function
     // passing the input to it
-    pub fn invoke(&self, input: HashMap<String, String>) -> Result<String, InvocationError> {
+    pub fn invoke(&mut self, input: HashMap<String, String>) -> Result<String, InvocationError> {
         self.wasm
             .invoke(input, self.config.clone())
             .map_err(|_| InvocationError::GenericError)
@@ -98,12 +101,13 @@ impl PluginManager {
 
     // invokes the plugin using wasm
     pub fn invoke(
-        &self,
+        &mut self,
         plugin_name: &str,
         input: HashMap<String, String>,
     ) -> Result<String, InvocationError> {
+        tracing::info!(plugin_name);
         self.plugins
-            .get(plugin_name)
+            .get_mut(plugin_name)
             .map_or(Err(InvocationError::PluginDoesNotExist), |p| {
                 p.invoke(input)
             })
