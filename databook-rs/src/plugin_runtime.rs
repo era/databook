@@ -204,7 +204,10 @@ impl WasmModule {
         // we parse the text format.
         //could use from_binary as well
         let module = Component::from_file(&engine, path)
-            .map_err(|e| WasmError::GenericError(format!("{} {}",e.to_string(), path)))?;
+            .map_err(|e| {
+                tracing::error!("{:?}", e);
+                WasmError::GenericError(format!("{} {}",e.to_string(), path))
+            })?;
 
         let mut linker = Linker::new(&engine);
         PluginSystem::add_to_linker(&mut linker, |cx: &mut Context| &mut cx.runtime)

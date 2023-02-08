@@ -22,3 +22,4 @@ impl PluginSystem for Plugin {
         hello
     }
 }
+export_plugin_system!(Plugin);
