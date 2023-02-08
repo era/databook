@@ -1,8 +1,0 @@
-// This is the start of your program, consider it as the main function of a Rust program
-// after the your wasm module is loaded, our runtime will invoke this.
-// the string you return, will be send to the grpc caller.
-// So whatever you want to return to the final user should be on that string.
-// You could for example send a json, xml, and any other text-format file here
-// as long as the caller is expecting you to do it.
-// The caller as in: whoever send a reques to databook-rs grpc server
-invoke: func() -> string

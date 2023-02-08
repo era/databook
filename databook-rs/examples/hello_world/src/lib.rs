@@ -1,9 +1,8 @@
-wit_bindgen_guest_rust::export!("../../../wit/plugin.wit");
-wit_bindgen_guest_rust::import!("../../../wit/runtime.wit");
+wit_bindgen_guest_rust::generate!("databook");
 
 struct Plugin;
 
-impl plugin::Plugin for Plugin {
+impl PluginSystem for Plugin {
     fn invoke() -> String {
         let mut hello = "Hello, ".to_string();
         let req = runtime::HttpRequest {

@@ -7,9 +7,9 @@ use std::str;
 
 use tracing::instrument;
 
-use wit_bindgen_host_wasmtime_rust::wasmtime::{Engine, Linker, Module, Store}; // 0.1.25
+use wasmtime::{Engine, Linker, Module, Store}; // 0.1.25
 
-wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
+//wit_bindgen_host_wasmtime_rust::import!("../wit/plugin.wit");
 use plugin::{Plugin, PluginData};
 
 struct Context {

@@ -2,7 +2,8 @@ use crate::plugin_config::PluginConfig;
 use std::collections::HashMap;
 use std::env;
 use url::{Host, Url};
-wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
+//wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
+wasmtime::component::bindgen!("../wit/databook.wit");
 use runtime::{
     Error, HttpHeaderParam, HttpHeaderResult, HttpRequest, HttpResponse, LogLevel, Runtime,
 };
