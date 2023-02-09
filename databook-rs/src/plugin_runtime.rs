@@ -24,6 +24,13 @@ impl Eq for HttpHeader {}
 pub struct PluginRuntime {
     pub config: PluginConfig,
     pub input: HashMap<String, String>,
+    pub wasi: wasmtime_wasi::WasiCtx,
+}
+
+fn default_wasi() -> wasmtime_wasi::WasiCtx {
+    wasmtime_wasi::sync::WasiCtxBuilder::new()
+        .inherit_stdio()
+        .build()
 }
 
 impl host::Host for PluginRuntime {
@@ -200,6 +207,11 @@ impl WasmModule {
             })?;
 
         let mut linker = Linker::new(&engine);
+
+        // let mut linker2 = wasmtime::Linker::new(&engine);
+        // wasmtime_wasi::add_to_linker(&mut linker2, |cx: &mut PluginRuntime| &mut cx.wasi)
+        //     .map_err(|e| WasmError::GenericError(e.to_string()))?;
+
         PluginSystem::add_to_linker(&mut linker, |state: &mut PluginRuntime| state)
             .map_err(|e| WasmError::GenericError(e.to_string()))?;
 
@@ -213,7 +225,7 @@ impl WasmModule {
     fn new_store(&self, config: PluginConfig, input: HashMap<String, String>) -> Store<PluginRuntime> {
         Store::new(
             &self.engine,
-    PluginRuntime { config, input }
+    PluginRuntime { config, input, wasi: default_wasi() }
         )
     }
 
@@ -280,6 +292,7 @@ mod tests {
                 allowed_domains: Some(vec!["127.0.0.1".to_string()]),
             },
             input: HashMap::new(),
+            wasi: default_wasi()
         };
 
         let response = match runtime.http(req).unwrap() {
@@ -299,6 +312,7 @@ mod tests {
                 allowed_domains: Some(vec!["google.com".to_string()]),
             },
             input: HashMap::new(),
+            wasi: default_wasi()
         };
 
         assert!(runtime.is_domain_allowed("https://google.com/something"));
@@ -314,6 +328,7 @@ mod tests {
                 allowed_domains: None,
             },
             input: HashMap::new(),
+            wasi: default_wasi()
         };
 
         assert!(!runtime.is_env_var_allowed("TEST1"));
@@ -330,6 +345,7 @@ mod tests {
                 allowed_domains: None,
             },
             input: HashMap::from([("my".to_string(), "test".to_string())]),
+            wasi: default_wasi()
         };
         assert_eq!(Some("test".to_string()), runtime.get("my".to_string()).unwrap());
     }
@@ -343,6 +359,7 @@ mod tests {
                 allowed_domains: None,
             },
             input: HashMap::new(),
+            wasi: default_wasi()
         };
         env::set_var("TEST".to_string(), "VAL".to_string());
 
@@ -417,6 +434,7 @@ mod tests {
                 allowed_domains: None,
             },
             input: HashMap::new(),
+            wasi: default_wasi(),
         };
         let my_message = "my";
 
