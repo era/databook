@@ -54,7 +54,7 @@ interface host {
 
 default world plugin-system {
 
-    import runtime: self.host
+   import host: self.host
 
   // This is the start of your program, consider it as the main function of a Rust program
   // after the your wasm module is loaded, our runtime will invoke this.

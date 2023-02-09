@@ -163,16 +163,6 @@ fn http_headers_to_runtime(header_map: &reqwest::header::HeaderMap) -> Vec<HttpH
     runtime_headers
 }
 
-
-
-// old wasm.rs
-
-struct Context {
-    //wasi: wasmtime_wasi::WasiCtx,
-    //exports: PluginData,
-    runtime: PluginRuntime,
-}
-
 #[derive(Debug)]
 pub enum WasmError {
     GenericError(String),
@@ -180,7 +170,7 @@ pub enum WasmError {
 
 pub struct WasmModule {
     module: Component,
-    linker: Linker<Context>,
+    linker: Linker<PluginRuntime>,
     engine: Engine,
 }
 
@@ -210,7 +200,7 @@ impl WasmModule {
             })?;
 
         let mut linker = Linker::new(&engine);
-        PluginSystem::add_to_linker(&mut linker, |cx: &mut Context| &mut cx.runtime)
+        PluginSystem::add_to_linker(&mut linker, |state: &mut PluginRuntime| state)
             .map_err(|e| WasmError::GenericError(e.to_string()))?;
 
         Ok(Self {
@@ -220,14 +210,10 @@ impl WasmModule {
         })
     }
 
-    fn new_store(&self, config: PluginConfig, input: HashMap<String, String>) -> Store<Context> {
+    fn new_store(&self, config: PluginConfig, input: HashMap<String, String>) -> Store<PluginRuntime> {
         Store::new(
             &self.engine,
-            Context {
-                // wasi: default_wasi(),
-                //exports: PluginData::default(),
-                runtime: PluginRuntime { config, input },
-            },
+    PluginRuntime { config, input }
         )
     }
 

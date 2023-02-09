@@ -5,19 +5,19 @@ struct Plugin;
 impl PluginSystem for Plugin {
     fn invoke() -> String {
         let mut hello = "Hello, ".to_string();
-        let req = runtime::HttpRequest {
+        let req = host::HttpRequest {
             method: "get".into(),
             url: "http://google.com/",
             params: "",
             body: "",
-            headers: &[runtime::HttpHeaderParam {
+            headers: &[host::HttpHeaderParam {
                 key: "User-Agent",
                 value: "databook",
             }],
         };
-        runtime::log(runtime::LogLevel::Info, "Starting request");
-        runtime::http(req);
-        runtime::log(runtime::LogLevel::Info, "Finished request");
+        host::log(host::LogLevel::Info, "Starting request");
+        host::http(req);
+        host::log(host::LogLevel::Info, "Finished request");
         hello.push_str("World");
         hello
     }
