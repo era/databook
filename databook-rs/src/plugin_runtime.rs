@@ -1,16 +1,14 @@
 use crate::plugin_config::PluginConfig;
 use std::collections::HashMap;
 use std::{env, fmt};
-use url::{Host, Url};
-use wasmtime::{Engine, Module, Store, Config};
-use wasmtime::component::Linker;
-use wasmtime::component::Component;
 use tracing::instrument;
+use url::{Host, Url};
+use wasmtime::component::Component;
+use wasmtime::component::Linker;
+use wasmtime::{Config, Engine, Module, Store};
 //wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
 wasmtime::component::bindgen!({world: "databook"});
-use host::{
-    Error, HttpHeader, HttpRequest, HttpResponse, LogLevel
-};
+use host::{Error, HttpHeader, HttpRequest, HttpResponse, LogLevel};
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 
@@ -201,19 +199,17 @@ impl WasmModule {
         config.wasm_component_model(true);
         let engine = Engine::new(&config).map_err(|e| {
             tracing::error!("error while creating engine {:?}", e);
-            WasmError::GenericError(format!("{} {}",e.to_string(), path))
+            WasmError::GenericError(format!("{} {}", e.to_string(), path))
         })?;
-
 
         // We start off by creating a `Module` which represents a compiled form
         // of our input wasm module. In this case it'll be JIT-compiled after
         // we parse the text format.
         //could use from_binary as well
-        let module = Component::from_file(&engine, path)
-            .map_err(|e| {
-                tracing::error!("{:?}", e);
-                WasmError::GenericError(format!("{} {}",e.to_string(), path))
-            })?;
+        let module = Component::from_file(&engine, path).map_err(|e| {
+            tracing::error!("{:?}", e);
+            WasmError::GenericError(format!("{} {}", e.to_string(), path))
+        })?;
 
         let mut linker = Linker::new(&engine);
 
@@ -231,10 +227,18 @@ impl WasmModule {
         })
     }
 
-    fn new_store(&self, config: PluginConfig, input: HashMap<String, String>) -> Store<PluginRuntime> {
+    fn new_store(
+        &self,
+        config: PluginConfig,
+        input: HashMap<String, String>,
+    ) -> Store<PluginRuntime> {
         Store::new(
             &self.engine,
-    PluginRuntime { config, input, wasi: default_wasi() }
+            PluginRuntime {
+                config,
+                input,
+                wasi: default_wasi(),
+            },
         )
     }
 
@@ -247,21 +251,21 @@ impl WasmModule {
     ) -> Result<String, WasmError> {
         let mut store = self.new_store(config, input);
         let (plugin, _instance) =
-            PluginSystem::instantiate(&mut store, &self.module, &mut self.linker)
-                .map_err(|e| {
-                    tracing::error!("error while instantiating plugin {:?}", e);
-                    WasmError::GenericError(e.to_string())
-                })?;
+            PluginSystem::instantiate(&mut store, &self.module, &mut self.linker).map_err(|e| {
+                tracing::error!("error while instantiating plugin {:?}", e);
+                WasmError::GenericError(e.to_string())
+            })?;
 
-        plugin.call_invoke(&mut store)
+        plugin
+            .call_invoke(&mut store)
             .map_err(|e| WasmError::GenericError(e.to_string()))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::host::Host;
+    use super::*;
     use wiremock::matchers::{method, path};
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -301,7 +305,7 @@ mod tests {
                 allowed_domains: Some(vec!["127.0.0.1".to_string()]),
             },
             input: HashMap::new(),
-            wasi: default_wasi()
+            wasi: default_wasi(),
         };
 
         let response = match runtime.http(req).unwrap() {
@@ -321,7 +325,7 @@ mod tests {
                 allowed_domains: Some(vec!["google.com".to_string()]),
             },
             input: HashMap::new(),
-            wasi: default_wasi()
+            wasi: default_wasi(),
         };
 
         assert!(runtime.is_domain_allowed("https://google.com/something"));
@@ -337,7 +341,7 @@ mod tests {
                 allowed_domains: None,
             },
             input: HashMap::new(),
-            wasi: default_wasi()
+            wasi: default_wasi(),
         };
 
         assert!(!runtime.is_env_var_allowed("TEST1"));
@@ -354,9 +358,12 @@ mod tests {
                 allowed_domains: None,
             },
             input: HashMap::from([("my".to_string(), "test".to_string())]),
-            wasi: default_wasi()
+            wasi: default_wasi(),
         };
-        assert_eq!(Some("test".to_string()), runtime.get("my".to_string()).unwrap());
+        assert_eq!(
+            Some("test".to_string()),
+            runtime.get("my".to_string()).unwrap()
+        );
     }
 
     #[test]
@@ -368,11 +375,14 @@ mod tests {
                 allowed_domains: None,
             },
             input: HashMap::new(),
-            wasi: default_wasi()
+            wasi: default_wasi(),
         };
         env::set_var("TEST".to_string(), "VAL".to_string());
 
-        assert_eq!("VAL".to_string(), runtime.env("TEST".to_string()).unwrap().unwrap());
+        assert_eq!(
+            "VAL".to_string(),
+            runtime.env("TEST".to_string()).unwrap().unwrap()
+        );
     }
 
     #[test]

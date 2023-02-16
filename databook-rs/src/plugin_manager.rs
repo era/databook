@@ -45,8 +45,8 @@ impl Plugin {
             Ok(wasm) => wasm,
             Err(e) => {
                 tracing::error!("error while trying to install plugin {:?}", e);
-                return None
-            },
+                return None;
+            }
         };
 
         match config {
