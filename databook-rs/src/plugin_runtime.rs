@@ -74,7 +74,7 @@ impl host::Host for PluginRuntime {
         let response = req.send().map_err(|e| Error {
             code: HTTP_REQUEST_FAILED,
             message: e.to_string(),
-        }).unwrap(); //TODO
+        })?;
 
         let headers = http_headers_to_runtime(response.headers());
 
@@ -199,7 +199,10 @@ impl WasmModule {
         // optimization level, enabled wasm features, etc.
         let mut config = Config::new();
         config.wasm_component_model(true);
-        let engine = Engine::new(&config).unwrap();//TODO
+        let engine = Engine::new(&config).map_err(|e| {
+            tracing::error!("error while creating engine {:?}", e);
+            WasmError::GenericError(format!("{} {}",e.to_string(), path))
+        })?;
 
 
         // We start off by creating a `Module` which represents a compiled form
