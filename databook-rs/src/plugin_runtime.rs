@@ -14,6 +14,12 @@ use host::{
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 
+type HostResult<T, E> = anyhow::Result<Result<T, E>>;
+
+type HostValue<T> = anyhow::Result<T>;
+
+type HostOption<T> = anyhow::Result<Option<T>>;
+
 impl PartialEq for HttpHeader {
     fn eq(&self, other: &Self) -> bool {
         self.key == other.key && self.value == other.value
@@ -34,7 +40,7 @@ fn default_wasi() -> wasmtime_wasi::WasiCtx {
 }
 
 impl host::Host for PluginRuntime {
-    fn http(&mut self, request: HttpRequest) -> Result<Result<HttpResponse, Error>, anyhow::Error> {
+    fn http(&mut self, request: HttpRequest) -> HostResult<HttpResponse, Error> {
         if !self.is_domain_allowed(&request.url) {
             return Ok(Err(Error {
                 code: 0,
@@ -82,7 +88,7 @@ impl host::Host for PluginRuntime {
         }))
     }
 
-    fn env(&mut self, key: String) -> Result<Result<String, Error>, anyhow::Error> {
+    fn env(&mut self, key: String) -> HostResult<String, Error> {
         let key = &key;
         if self.is_env_var_allowed(key) {
             Ok(env::var(key).map_err(|e| Error {
@@ -100,11 +106,11 @@ impl host::Host for PluginRuntime {
         }
     }
 
-    fn get(&mut self, key: String) -> Result<Option<String>, anyhow::Error> {
+    fn get(&mut self, key: String) -> HostOption<String> {
         Ok(self.input.get(&key).cloned()) //TODO
     }
 
-    fn log(&mut self, level: LogLevel, message: String) -> std::result::Result<(), anyhow::Error> {
+    fn log(&mut self, level: LogLevel, message: String) -> HostValue<()> {
         match level {
             LogLevel::Error => tracing::error!("{}", message),
             LogLevel::Debug => tracing::debug!("{}", message),
