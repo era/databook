@@ -1,3 +1,5 @@
+package databook:plugin
+
 interface host {
   
   record error {
@@ -52,9 +54,9 @@ interface host {
     log: func(level: log-level, message: string)
 }
 
-default world plugin-system {
+world plugin-system {
 
-   import host: self.host
+   import host
 
   // This is the start of your program, consider it as the main function of a Rust program
   // after the your wasm module is loaded, our runtime will invoke this.

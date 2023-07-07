@@ -2,13 +2,15 @@ use crate::plugin_config::PluginConfig;
 use std::collections::HashMap;
 use std::{env, fmt};
 use tracing::instrument;
-use url::{Host, Url};
+use url::{Host as HostURL, Url};
 use wasmtime::component::Component;
 use wasmtime::component::Linker;
 use wasmtime::{Config, Engine, Module, Store};
 //wit_bindgen_host_wasmtime_rust::export!("../wit/runtime.wit");
-wasmtime::component::bindgen!({world: "databook"});
-use host::{Error, HttpHeader, HttpRequest, HttpResponse, LogLevel};
+wasmtime::component::bindgen!({world: "plugin-system"});
+use crate::plugin_runtime::databook::plugin::host::{
+    Error, Host, HttpHeader, HttpRequest, HttpResponse, LogLevel,
+};
 
 const HTTP_REQUEST_FAILED: u16 = 100;
 
@@ -37,7 +39,7 @@ fn default_wasi() -> wasmtime_wasi::WasiCtx {
         .build()
 }
 
-impl host::Host for PluginRuntime {
+impl databook::plugin::host::Host for PluginRuntime {
     fn http(&mut self, request: HttpRequest) -> HostResult<HttpResponse, Error> {
         if !self.is_domain_allowed(&request.url) {
             return Ok(Err(Error {
@@ -128,7 +130,7 @@ impl PluginRuntime {
                     if let Some(host) = url.host() {
                         allowed_domain
                             .iter()
-                            .any(|i| Host::parse(i).unwrap() == host)
+                            .any(|i| HostURL::parse(i).unwrap() == host)
                     } else {
                         false
                     }

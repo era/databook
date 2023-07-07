@@ -1,4 +1,6 @@
-wit_bindgen_guest_rust::generate!("databook");
+wit_bindgen::generate!("plugin-system");
+
+use databook::plugin::host;
 
 struct Plugin;
 
@@ -7,16 +9,17 @@ impl PluginSystem for Plugin {
         let mut hello = "Hello, ".to_string();
         let req = host::HttpRequest {
             method: "get".into(),
-            url: "http://google.com/",
-            params: "",
-            body: "",
-            headers: &[host::HttpHeaderParam {
-                key: "User-Agent",
-                value: "databook",
-            }],
+            url: "http://google.com/".into(),
+            params: "".into(),
+            body: "".into(),
+            headers: (&[host::HttpHeader {
+                key: "User-Agent".into(),
+                value: "databook".into(),
+            }])
+                .to_vec(),
         };
         host::log(host::LogLevel::Info, "Starting request");
-        host::http(req);
+        let _ = host::http(&req);
         host::log(host::LogLevel::Info, "Finished request");
         hello.push_str("World");
         hello
